@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../domain/entities/recording_entity.dart';
 import '../../../widgets/app_loading_indicator.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../journey_controller.dart';
 import 'journey_period_filter_sheet.dart';
 
@@ -481,7 +482,9 @@ class _RecordingCard extends GetView<JourneyController> {
                 tooltip: 'Abrir gravacao',
                 onPressed: recording.isActive
                     ? null
-                    : () => controller.openRecording(recording),
+                    : () => PremiumAccessGuard().run(
+                        () => controller.openRecording(recording),
+                      ),
                 icon: const Icon(Icons.play_circle_outline_rounded),
                 color: AppColors.royalBlue,
               ),
@@ -492,7 +495,9 @@ class _RecordingCard extends GetView<JourneyController> {
                   tooltip: 'Excluir gravacao',
                   onPressed: deleting
                       ? null
-                      : () => controller.requestDeleteRecording(recording),
+                      : () => PremiumAccessGuard().run(
+                          () => controller.requestDeleteRecording(recording),
+                        ),
                   icon: deleting
                       ? const SizedBox(
                           width: 18,

@@ -8,6 +8,7 @@ import '../app_bubble/app_bubble_service.dart';
 import '../accessibility/accessibility_service.dart';
 import '../../data/local/get_storage_session_store.dart';
 import '../../data/local/get_storage_user_cache.dart';
+import '../../domain/services/premium_access_policy.dart';
 import '../accessibility/accessibility_controller.dart';
 import '../config/app_environment.dart';
 import '../dashboard/dashboard_refresh_notifier.dart';
@@ -56,6 +57,12 @@ class CoreBinding extends Bindings {
     if (!Get.isRegistered<UserCache>()) {
       Get.put<UserCache>(
         GetStorageUserCache(storage: storage),
+        permanent: true,
+      );
+    }
+    if (!Get.isRegistered<PremiumAccessPolicy>()) {
+      Get.put<PremiumAccessPolicy>(
+        const PremiumAccessPolicy(),
         permanent: true,
       );
     }

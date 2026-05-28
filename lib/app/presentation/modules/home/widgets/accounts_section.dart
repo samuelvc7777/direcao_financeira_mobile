@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/utils/responsive.dart';
 import '../../../../domain/entities/bank_account_entity.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../home_controller.dart';
 
 class AccountsSection extends GetView<HomeController> {
@@ -64,7 +65,9 @@ class AccountsSection extends GetView<HomeController> {
             child: Column(
               children: [
                 InkWell(
-                  onTap: () => Get.toNamed('/bank-accounts'),
+                  onTap: () => PremiumAccessGuard().run(
+                    () => Get.toNamed('/bank-accounts'),
+                  ),
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -79,7 +82,9 @@ class AccountsSection extends GetView<HomeController> {
                           decoration: BoxDecoration(
                             color: isDark
                                 ? const Color(0xFF244A77)
-                                : AppColors.accountsAccent.withValues(alpha: 0.12),
+                                : AppColors.accountsAccent.withValues(
+                                    alpha: 0.12,
+                                  ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(

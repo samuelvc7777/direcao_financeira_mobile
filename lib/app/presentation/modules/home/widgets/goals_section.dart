@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../domain/entities/goal_entity.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../home_controller.dart';
 
 class GoalsSection extends GetView<HomeController> {
@@ -42,11 +43,13 @@ class GoalsSection extends GetView<HomeController> {
             _Header(
               completed: completed,
               total: totalGoals,
-              onManage: controller.openGoals,
+              onManage: () => PremiumAccessGuard().run(controller.openGoals),
             ),
             const SizedBox(height: 20),
             if (goals.isEmpty)
-              _EmptyGoalsSummary(onManage: controller.openGoals)
+              _EmptyGoalsSummary(
+                onManage: () => PremiumAccessGuard().run(controller.openGoals),
+              )
             else ...[
               _OverallProgress(progressPercent: overallProgress),
               const SizedBox(height: 16),

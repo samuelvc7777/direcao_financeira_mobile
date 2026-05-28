@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../domain/entities/ride_entity.dart';
 import '../../../widgets/app_loading_indicator.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../journey_controller.dart';
 import 'journey_period_filter_sheet.dart';
 
@@ -463,7 +464,7 @@ class RidesListSection extends GetView<JourneyController> {
     }
 
     if (action == _RideAction.delete) {
-      await controller.requestDeleteRide(ride);
+      await PremiumAccessGuard().run(() => controller.requestDeleteRide(ride));
     }
   }
 

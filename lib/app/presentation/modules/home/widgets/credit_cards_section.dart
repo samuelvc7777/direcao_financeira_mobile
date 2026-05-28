@@ -6,6 +6,7 @@ import 'package:direcao_financeira_mobile/app/core/theme/app_colors.dart';
 
 import '../../../../core/utils/responsive.dart';
 import '../../../../domain/entities/credit_card_entity.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../home_controller.dart';
 import 'invoice_payment_sheet.dart';
 
@@ -79,7 +80,9 @@ class _CreditCardsSectionState extends State<CreditCardsSection> {
             child: Column(
               children: [
                 InkWell(
-                  onTap: () => Get.toNamed('/credit-cards'),
+                  onTap: () => PremiumAccessGuard().run(
+                    () => Get.toNamed('/credit-cards'),
+                  ),
                   borderRadius: BorderRadius.circular(14),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -455,10 +458,12 @@ class _CreditCardsSectionState extends State<CreditCardsSection> {
       child: FilledButton.icon(
         onPressed: isPaying
             ? null
-            : () => _showPayInvoiceSheet(
-                context: context,
-                controller: controller,
-                card: card,
+            : () => PremiumAccessGuard().run(
+                () => _showPayInvoiceSheet(
+                  context: context,
+                  controller: controller,
+                  card: card,
+                ),
               ),
         style: FilledButton.styleFrom(
           backgroundColor: card.isInvoiceOverdue ? AppColors.rose : cardColor,
