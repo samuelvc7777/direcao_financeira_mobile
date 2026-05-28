@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/premium_access_guard.dart';
 import 'settings_controller.dart';
 import 'widgets/settings_profile_card.dart';
 import 'widgets/settings_section_card.dart';
@@ -61,7 +62,7 @@ class SettingsView extends GetView<SettingsController> {
                                   child: SettingsSectionCard(
                                     title: section.title,
                                     items: section.items,
-                                    onItemTap: controller.openSettingItem,
+                                    onItemTap: (item) => _openSettingItem(item),
                                   ),
                                 ),
                               )
@@ -83,6 +84,15 @@ class SettingsView extends GetView<SettingsController> {
         },
       ),
     );
+  }
+
+  void _openSettingItem(SettingsItemData item) {
+    if (item.title == 'Ajuda') {
+      controller.openSettingItem(item);
+      return;
+    }
+
+    PremiumAccessGuard().run(() => controller.openSettingItem(item));
   }
 }
 

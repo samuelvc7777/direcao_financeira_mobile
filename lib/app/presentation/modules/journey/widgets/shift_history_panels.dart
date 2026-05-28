@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../widgets/app_loading_indicator.dart';
+import '../../../widgets/premium_access_guard.dart';
 import '../journey_controller.dart';
 import 'manual_shift_form_sheet.dart';
 
@@ -41,7 +42,7 @@ class ShiftStartPanel extends StatelessWidget {
             child: Obx(
               () => ElevatedButton.icon(
                 onPressed: controller.canStartShift
-                    ? controller.startShift
+                    ? () => PremiumAccessGuard().run(controller.startShift)
                     : null,
                 icon: controller.isStartingShift.value
                     ? const AppLoadingIndicator(
@@ -85,7 +86,7 @@ class ShiftStartPanel extends StatelessWidget {
             child: Obx(
               () => ElevatedButton.icon(
                 onPressed: controller.canAddManualShift
-                    ? () async {
+                    ? () => PremiumAccessGuard().run(() async {
                         if (!context.mounted) {
                           return;
                         }
@@ -93,7 +94,7 @@ class ShiftStartPanel extends StatelessWidget {
                           context,
                           controller: controller,
                         );
-                      }
+                      })
                     : null,
                 icon: controller.isAddingManualShift.value
                     ? const AppLoadingIndicator(
@@ -239,7 +240,7 @@ class ShiftActivePanel extends StatelessWidget {
               child: Obx(
                 () => ShiftActionButton(
                   onPressed: controller.canPauseOrResumeShift
-                      ? controller.pauseShift
+                      ? () => PremiumAccessGuard().run(controller.pauseShift)
                       : null,
                   icon: controller.isPauseShiftLoading.value
                       ? Icons.hourglass_top_rounded
@@ -256,7 +257,7 @@ class ShiftActivePanel extends StatelessWidget {
               child: Obx(
                 () => ShiftActionButton(
                   onPressed: controller.canFinishShift
-                      ? controller.finishShift
+                      ? () => PremiumAccessGuard().run(controller.finishShift)
                       : null,
                   icon: controller.isFinishingShift.value
                       ? Icons.hourglass_top_rounded
@@ -382,10 +383,10 @@ class ShiftQuickToggleButton extends StatelessWidget {
 
       return InkWell(
         onTap: _isTrafficLight
-            ? controller.toggleTrafficLight
+            ? () => PremiumAccessGuard().run(controller.toggleTrafficLight)
             : _isRecording
-            ? controller.toggleRecording
-            : controller.toggleAssistant,
+            ? () => PremiumAccessGuard().run(controller.toggleRecording)
+            : () => PremiumAccessGuard().run(controller.toggleAssistant),
         borderRadius: BorderRadius.circular(
           Responsive.sp(context, 12).clamp(8.0, 16.0),
         ),

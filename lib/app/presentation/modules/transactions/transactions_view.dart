@@ -11,6 +11,7 @@ import '../../../routes/app_pages.dart';
 import '../../widgets/app_month_selector.dart';
 import '../../widgets/app_loading_indicator.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/premium_access_guard.dart';
 import 'transactions_controller.dart';
 import 'widgets/transaction_type_selector_sheet.dart';
 import 'widgets/transactions_card_recurring_section.dart';
@@ -40,7 +41,7 @@ class TransactionsView extends GetView<TransactionsController> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _openCreateTransactionFlow,
+        onPressed: () => PremiumAccessGuard().run(_openCreateTransactionFlow),
         backgroundColor: colorScheme.primary,
         elevation: 8,
         child: Icon(Icons.add_rounded, color: colorScheme.onPrimary, size: 28),
@@ -215,7 +216,7 @@ class TransactionsView extends GetView<TransactionsController> {
 
     switch (action) {
       case _TransactionAction.edit:
-        await _onEditTransaction(transaction);
+        await PremiumAccessGuard().run(() => _onEditTransaction(transaction));
         return;
       case _TransactionAction.delete:
         _onDeleteTransaction(transaction);
