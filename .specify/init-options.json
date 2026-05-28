@@ -1,0 +1,6 @@
+{
+  "ai": "codex",
+  "ai_skills": true,
+  "shell": "powershell",
+  "branch_numbering": "sequential"
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next.js Clean Architecture"
+  short_description: "Arquitetura senior para apps Next.js escalaveis"
+  default_prompt: "Use $nextjs-clean-architecture para estruturar, revisar ou refatorar um app Next.js com Clean Architecture, fronteiras claras e padroes senior de implementacao."

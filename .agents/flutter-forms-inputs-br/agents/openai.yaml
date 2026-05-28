@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Forms Inputs BR"
+  short_description: "Melhora formularios Flutter no contexto BR"
+  default_prompt: "Use $flutter-forms-inputs-br para implementar ou revisar um formulario Flutter com validacao, mascaras brasileiras, foco correto e tratamento monetario seguro."

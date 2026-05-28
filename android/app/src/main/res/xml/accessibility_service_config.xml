@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canTakeScreenshot="true"
+    android:canRetrieveWindowContent="false"
+    android:packageNames="com.app99.driver,com.nineninetaxis.driver,com.taxis99.driver,com.taxis99,br.com.devbase.movesj.prestador,br.com.melevasj.taxi.drivermachine,com.google.android.apps.photos"
+    android:notificationTimeout="350" />

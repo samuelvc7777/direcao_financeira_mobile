@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dire&#231;&#227;o Financeira</string>
+    <string name="screen_reader_service_label">Dire&#231;&#227;o Financeira</string>
+    <string name="app_bubble_special_use_label">Bal&#227;o flutuante da logo do app</string>
+    <string name="app_bubble_notification_channel_name">Bal&#227;o flutuante</string>
+    <string name="app_bubble_notification_channel_description">Mant&#233;m a logo da Dire&#231;&#227;o Financeira vis&#237;vel sobre outros apps.</string>
+    <string name="app_bubble_notification_title">Bal&#227;o flutuante ativo</string>
+    <string name="app_bubble_notification_text">Toque na logo para abrir o menu rapido da jornada.</string>
+    <string name="app_bubble_stop_action">Desligar</string>
+    <string name="app_bubble_action_shifts">Turnos</string>
+    <string name="app_bubble_action_rides">Corridas</string>
+    <string name="app_bubble_action_recordings">Gravacoes</string>
+    <string name="app_bubble_action_enable_recording">Ativar gravacao</string>
+    <string name="app_bubble_action_disable_recording">Parar gravacao</string>
+    <string name="app_bubble_action_enable_traffic_light">Ativar semaforo</string>
+    <string name="app_bubble_action_disable_traffic_light">Semaforo ativo</string>
+    <string name="recording_notification_channel_name">Gravacao em andamento</string>
+    <string name="recording_notification_channel_description">Mantem camera e microfone ativos enquanto a gravacao estiver ligada.</string>
+    <string name="recording_notification_title">Gravacao ativa</string>
+    <string name="recording_notification_text">Audio e video estao sendo gravados com notificacao visivel.</string>
+    <string name="recording_stop_action">Parar</string>
+</resources>

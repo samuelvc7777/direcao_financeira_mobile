@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Clean Architecture GetX"
+  short_description: "Estrutura features Flutter com arquitetura senior"
+  default_prompt: "Use $flutter-clean-architecture-getx para estruturar, revisar ou implementar uma feature Flutter com Clean Architecture, GetX e tratamento de erros consistente."

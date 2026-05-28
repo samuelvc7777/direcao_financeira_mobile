@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Codebase"
+  short_description: "Documenta o codigo existente"
+  default_prompt: "Use $research-codebase para documentar o codebase existente com base em arquivos e componentes reais."

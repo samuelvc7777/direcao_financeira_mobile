@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Plan"
+  short_description: "Executa planos tecnicos aprovados"
+  default_prompt: "Use $implement-plan para implementar um plano tecnico aprovado com verificacao e rastreabilidade."

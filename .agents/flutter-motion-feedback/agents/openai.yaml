@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Motion Feedback"
+  short_description: "Aplica animacoes Flutter com foco em UX"
+  default_prompt: "Use $flutter-motion-feedback para adicionar ou revisar animacoes, microinteracoes e feedback tatil em Flutter com boa performance."

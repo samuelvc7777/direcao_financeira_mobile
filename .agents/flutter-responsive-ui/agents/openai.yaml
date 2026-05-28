@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Responsive UI"
+  short_description: "Ajusta telas Flutter para mobile e tablet"
+  default_prompt: "Use $flutter-responsive-ui para criar ou revisar uma tela Flutter com responsividade, tema consistente e layout adaptativo."

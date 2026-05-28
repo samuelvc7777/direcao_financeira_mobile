@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Plan"
+  short_description: "Cria planos tecnicos detalhados"
+  default_prompt: "Use $create-plan para criar um plano tecnico detalhado a partir de contexto, pesquisa e arquivos do repositorio."

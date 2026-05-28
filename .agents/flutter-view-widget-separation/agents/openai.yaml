@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter View Widget Separation"
+  short_description: "Separa view Flutter em widgets menores com criterio"
+  default_prompt: "Use $flutter-view-widget-separation para refatorar uma tela Flutter grande, separando a view principal em widgets menores e mais legiveis."
