@@ -1,10 +1,17 @@
 import 'package:direcao_financeira_mobile/app/core/session/user_cache.dart';
 import 'package:direcao_financeira_mobile/app/core/theme/app_theme.dart';
+import 'package:direcao_financeira_mobile/app/core/errors/failures.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/plan_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/store_product_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/store_purchase_event_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/subscription_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/user_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/repositories/i_subscription_repository.dart';
 import 'package:direcao_financeira_mobile/app/domain/services/premium_access_policy.dart';
+import 'package:direcao_financeira_mobile/app/domain/usecases/subscription_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/presentation/widgets/premium_access_guard.dart';
 import 'package:direcao_financeira_mobile/app/routes/app_pages.dart';
+import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -39,7 +46,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(called, isFalse);
-    expect(find.text('Assinatura premium'), findsOneWidget);
+    expect(find.text('7 dias grátis'), findsOneWidget);
   });
 
   testWidgets('bloqueia callback protegido quando assinatura esta vencida', (
@@ -68,7 +75,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(called, isFalse);
-    expect(find.text('Assinatura premium'), findsOneWidget);
+    expect(find.text('7 dias grátis'), findsOneWidget);
   });
 
   testWidgets('CTA do banner navega para assinatura', (tester) async {
@@ -81,7 +88,7 @@ void main() {
 
     await tester.tap(find.text('Acao protegida'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('VER ASSINATURA'));
+    await tester.tap(find.text('Ver planos'));
     await tester.pumpAndSettle();
 
     expect(find.text('Tela de assinatura'), findsOneWidget);
@@ -113,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(called, isTrue);
-    expect(find.text('Assinatura premium'), findsNothing);
+    expect(find.text('7 dias grátis'), findsNothing);
   });
 
   testWidgets('nao empilha banners em toque repetido', (tester) async {
@@ -128,7 +135,41 @@ void main() {
     await tester.tap(find.text('Acao protegida'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.text('Assinatura premium'), findsOneWidget);
+    expect(find.text('7 dias grátis'), findsOneWidget);
+  });
+  testWidgets('atualiza cache remoto antes de bloquear recurso premium', (
+    tester,
+  ) async {
+    var called = false;
+    final userCache = _FakeUserCache(_user(activeSubscription: null));
+    final subscriptionRepository = _FakeSubscriptionRepository(userCache)
+      ..activeSubscription = _subscription(
+        status: 'ACTIVE',
+        endDate: DateTime.now().add(const Duration(days: 7)),
+      );
+    Get.put<UserCache>(userCache);
+
+    await _pumpGuardApp(
+      tester,
+      onPressed: () =>
+          PremiumAccessGuard(
+            getMySubscriptionUseCase: GetMySubscriptionUseCase(
+              subscriptionRepository,
+            ),
+            syncStoredUserSubscriptionUseCase:
+                SyncStoredUserSubscriptionUseCase(subscriptionRepository),
+          ).run(() {
+            called = true;
+          }),
+    );
+
+    await tester.tap(find.text('Acao protegida'));
+    await tester.pumpAndSettle();
+
+    expect(called, isTrue);
+    expect(subscriptionRepository.syncStoredUserCalled, isTrue);
+    expect(userCache.getUser()?.activeSubscription?.grantsAccess, isTrue);
+    expect(find.text('7 dias grátis'), findsNothing);
   });
 }
 
@@ -219,4 +260,84 @@ class _FakeUserCache implements UserCache {
       subscriptions: subscriptions ?? currentUser.subscriptions,
     );
   }
+}
+
+class _FakeSubscriptionRepository implements ISubscriptionRepository {
+  _FakeSubscriptionRepository(this.userCache);
+
+  final UserCache userCache;
+  SubscriptionEntity? activeSubscription;
+  bool syncStoredUserCalled = false;
+
+  @override
+  Stream<StorePurchaseEventEntity> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> getMySubscription() async =>
+      Right(activeSubscription);
+
+  @override
+  Future<Either<Failure, void>> syncStoredUser({
+    SubscriptionEntity? activeSubscription,
+    List<SubscriptionEntity>? subscriptions,
+  }) async {
+    syncStoredUserCalled = true;
+    await userCache.syncUserSubscription(
+      activeSubscription: activeSubscription,
+      subscriptions: subscriptions,
+    );
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> cancelSubscription() async =>
+      const Right(null);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> changePlan(int planId) async =>
+      const Right(null);
+
+  @override
+  Future<Either<Failure, void>> completePurchase(String productId) async =>
+      const Right(null);
+
+  @override
+  Future<Either<Failure, List<PlanEntity>>> getAvailablePlans() async =>
+      const Right([]);
+
+  @override
+  Future<Either<Failure, List<SubscriptionEntity>>>
+  getSubscriptionHistory() async => const Right([]);
+
+  @override
+  Future<Either<Failure, List<StoreProductEntity>>> getStoreProducts(
+    Set<String> productIds,
+  ) async => const Right([]);
+
+  @override
+  Future<Either<Failure, bool>> isStoreAvailable() async => const Right(false);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> renewSubscription({
+    required bool autoRenew,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> restorePurchases({
+    String? applicationUserName,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> buyProduct({
+    required String productId,
+    String? applicationUserName,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> syncStorePurchase({
+    required int planId,
+    required String productId,
+    required String purchaseToken,
+    String? purchaseId,
+  }) async => const Right(null);
 }

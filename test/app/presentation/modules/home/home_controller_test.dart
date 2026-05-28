@@ -6,6 +6,10 @@ import 'package:direcao_financeira_mobile/app/core/update/play_store_update_serv
 import 'package:direcao_financeira_mobile/app/domain/entities/bank_account_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/category_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/credit_card_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/plan_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/store_product_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/store_purchase_event_entity.dart';
+import 'package:direcao_financeira_mobile/app/domain/entities/subscription_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/transaction_draft_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/transaction_entity.dart';
 import 'package:direcao_financeira_mobile/app/domain/entities/user_entity.dart';
@@ -13,12 +17,14 @@ import 'package:direcao_financeira_mobile/app/domain/repositories/i_auth_reposit
 import 'package:direcao_financeira_mobile/app/domain/repositories/i_bank_account_repository.dart';
 import 'package:direcao_financeira_mobile/app/domain/repositories/i_category_repository.dart';
 import 'package:direcao_financeira_mobile/app/domain/repositories/i_credit_card_repository.dart';
+import 'package:direcao_financeira_mobile/app/domain/repositories/i_subscription_repository.dart';
 import 'package:direcao_financeira_mobile/app/domain/repositories/i_transaction_repository.dart';
 import 'package:direcao_financeira_mobile/app/domain/services/invoice_payment_validator.dart';
 import 'package:direcao_financeira_mobile/app/domain/usecases/auth_session_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/domain/usecases/bank_account_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/domain/usecases/category_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/domain/usecases/credit_card_use_cases.dart';
+import 'package:direcao_financeira_mobile/app/domain/usecases/subscription_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/domain/usecases/transaction_use_cases.dart';
 import 'package:direcao_financeira_mobile/app/presentation/modules/home/home_controller.dart';
 import 'package:direcao_financeira_mobile/app/presentation/modules/home/home_tab_navigation.dart';
@@ -26,16 +32,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 class _FakeAuthRepository implements IAuthRepository {
+  _FakeAuthRepository({UserEntity? storedUser})
+    : storedUser =
+          storedUser ??
+          UserEntity(
+            id: 1,
+            name: 'Samuel',
+            email: 'samuel@test.com',
+            role: 'user',
+            isActive: true,
+          );
+
+  UserEntity? storedUser;
+
   @override
-  Either<Failure, UserEntity?> getStoredUser() => Right(
-    UserEntity(
-      id: 1,
-      name: 'Samuel',
-      email: 'samuel@test.com',
-      role: 'user',
-      isActive: true,
-    ),
-  );
+  Either<Failure, UserEntity?> getStoredUser() => Right(storedUser);
 
   @override
   Future<Either<Failure, String?>> getToken() async => const Right(null);
@@ -74,8 +85,87 @@ class _FakeAuthRepository implements IAuthRepository {
       const Right(null);
 
   @override
-  Future<Either<Failure, void>> saveUser(UserEntity user) async =>
+  Future<Either<Failure, void>> saveUser(UserEntity user) async {
+    storedUser = user;
+    return const Right(null);
+  }
+}
+
+class _FakeSubscriptionRepository implements ISubscriptionRepository {
+  SubscriptionEntity? activeSubscription;
+  SubscriptionEntity? syncedActiveSubscription;
+  List<SubscriptionEntity>? syncedSubscriptions;
+  bool syncStoredUserCalled = false;
+
+  @override
+  Stream<StorePurchaseEventEntity> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> getMySubscription() async =>
+      Right(activeSubscription);
+
+  @override
+  Future<Either<Failure, void>> syncStoredUser({
+    SubscriptionEntity? activeSubscription,
+    List<SubscriptionEntity>? subscriptions,
+  }) async {
+    syncStoredUserCalled = true;
+    syncedActiveSubscription = activeSubscription;
+    syncedSubscriptions = subscriptions;
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> cancelSubscription() async =>
       const Right(null);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> changePlan(int planId) async =>
+      const Right(null);
+
+  @override
+  Future<Either<Failure, void>> completePurchase(String productId) async =>
+      const Right(null);
+
+  @override
+  Future<Either<Failure, List<PlanEntity>>> getAvailablePlans() async =>
+      const Right([]);
+
+  @override
+  Future<Either<Failure, List<SubscriptionEntity>>>
+  getSubscriptionHistory() async => const Right([]);
+
+  @override
+  Future<Either<Failure, List<StoreProductEntity>>> getStoreProducts(
+    Set<String> productIds,
+  ) async => const Right([]);
+
+  @override
+  Future<Either<Failure, bool>> isStoreAvailable() async => const Right(false);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> renewSubscription({
+    required bool autoRenew,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> restorePurchases({
+    String? applicationUserName,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, void>> buyProduct({
+    required String productId,
+    String? applicationUserName,
+  }) async => const Right(null);
+
+  @override
+  Future<Either<Failure, SubscriptionEntity?>> syncStorePurchase({
+    required int planId,
+    required String productId,
+    required String purchaseToken,
+    String? purchaseId,
+  }) async => const Right(null);
 }
 
 class _FakeBankAccountRepository implements IBankAccountRepository {
@@ -706,6 +796,67 @@ void main() {
 
       controller.onClose();
     });
+
+    test(
+      'sincroniza assinatura remota na abertura quando cache esta stale',
+      () async {
+        final authRepository = _FakeAuthRepository(
+          storedUser: UserEntity(
+            id: 1,
+            name: 'Samuel',
+            email: 'samuel@test.com',
+            role: 'user',
+            isActive: true,
+            activeSubscription: null,
+          ),
+        );
+        final subscriptionRepository = _FakeSubscriptionRepository()
+          ..activeSubscription = SubscriptionEntity(
+            id: 7,
+            status: 'ACTIVE',
+            startDate: DateTime.now().subtract(const Duration(days: 1)),
+            endDate: DateTime.now().add(const Duration(days: 7)),
+            autoRenew: true,
+          );
+        final localController = HomeController(
+          getStoredUserUseCase: GetStoredUserUseCase(authRepository),
+          logoutUseCase: LogoutUseCase(authRepository),
+          loadBankAccountsUseCase: LoadBankAccountsUseCase(
+            _FakeBankAccountRepository(),
+          ),
+          loadCreditCardsUseCase: LoadCreditCardsUseCase(creditCardRepository),
+          loadCategoriesUseCase: LoadCategoriesUseCase(categoryRepository),
+          createCategoryUseCase: CreateCategoryUseCase(categoryRepository),
+          getTransactionsUseCase: GetTransactionsUseCase(transactionRepository),
+          createInvoicePaymentUseCase: CreateInvoicePaymentUseCase(
+            transactionRepository,
+          ),
+          getMySubscriptionUseCase: GetMySubscriptionUseCase(
+            subscriptionRepository,
+          ),
+          syncStoredUserSubscriptionUseCase: SyncStoredUserSubscriptionUseCase(
+            subscriptionRepository,
+          ),
+          invoicePaymentValidator: const InvoicePaymentValidator(),
+          dashboardRefreshNotifier: DefaultDashboardRefreshNotifier(),
+          homeTabNavigation: _FakeHomeTabNavigation(),
+          realtimeClient: realtimeClient,
+          appUpdateService: appUpdateService,
+        );
+
+        localController.onInit();
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(subscriptionRepository.syncStoredUserCalled, isTrue);
+        expect(
+          subscriptionRepository.syncedActiveSubscription?.grantsAccess,
+          isTrue,
+        );
+
+        localController.onClose();
+      },
+    );
 
     test('abre a loja quando o usuario toca no botao de atualizar', () async {
       await controller.openAppStore();
