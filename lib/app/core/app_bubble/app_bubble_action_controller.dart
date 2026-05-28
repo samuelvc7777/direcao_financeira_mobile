@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
-import '../subscription/subscription_access_gate.dart';
 import '../../presentation/modules/journey/journey_binding.dart';
 import '../../presentation/modules/initial/initial_controller.dart';
 import '../../routes/app_pages.dart';
@@ -82,10 +81,6 @@ class AppBubbleActionController extends GetxController {
   }
 
   Future<void> _openJourney({required int initialTabIndex}) async {
-    if (!await SubscriptionAccessGate.ensureAccess()) {
-      return;
-    }
-
     JourneyBinding().dependencies();
 
     if (Get.isRegistered<InitialController>()) {

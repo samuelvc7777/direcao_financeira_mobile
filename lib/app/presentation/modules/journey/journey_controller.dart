@@ -7,7 +7,6 @@ import 'package:get/get.dart';
 
 import '../../../core/feedback/app_snackbar.dart';
 import '../../../core/location/location_permission_settings.dart';
-import '../../../core/subscription/subscription_access_gate.dart';
 import '../../../domain/entities/active_shift_entity.dart';
 import '../../../domain/entities/costs_gains_settings_entity.dart';
 import '../../../domain/entities/journey_statistics_entity.dart';
@@ -973,10 +972,6 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> startShift() async {
-    if (!await SubscriptionAccessGate.ensureAccess()) {
-      return;
-    }
-
     isStartingShift.value = true;
     final started = await shiftLifecycleCoordinator.startShift(
       onTrackingStatusResolved: (status) => trackingStatus.value = status,

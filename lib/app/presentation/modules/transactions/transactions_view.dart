@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/subscription/subscription_access_gate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/transaction_entity.dart';
@@ -188,10 +187,6 @@ class TransactionsView extends GetView<TransactionsController> {
   }
 
   Future<void> _openCreateTransactionFlow() async {
-    if (!await SubscriptionAccessGate.ensureAccess()) {
-      return;
-    }
-
     Get.bottomSheet(
       const TransactionTypeSelectorSheet(),
       isScrollControlled: true,
@@ -200,10 +195,6 @@ class TransactionsView extends GetView<TransactionsController> {
   }
 
   Future<void> _onEditTransaction(TransactionEntity transaction) async {
-    if (!await SubscriptionAccessGate.ensureAccess()) {
-      return;
-    }
-
     if (transaction.assetType == AssetType.creditCard) {
       Get.toNamed(AppRoutes.transactionCreditCard, arguments: transaction);
     } else {
@@ -227,9 +218,7 @@ class TransactionsView extends GetView<TransactionsController> {
         await _onEditTransaction(transaction);
         return;
       case _TransactionAction.delete:
-        if (await SubscriptionAccessGate.ensureAccess()) {
-          _onDeleteTransaction(transaction);
-        }
+        _onDeleteTransaction(transaction);
         return;
       case _TransactionAction.cancel:
       case null:
