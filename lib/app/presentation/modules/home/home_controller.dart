@@ -18,6 +18,7 @@ import '../../../domain/usecases/bank_account_use_cases.dart';
 import '../../../domain/usecases/category_use_cases.dart';
 import '../../../domain/usecases/credit_card_use_cases.dart';
 import '../../../domain/usecases/goal_use_cases.dart';
+import '../../../domain/usecases/subscription_use_cases.dart';
 import '../../../domain/usecases/transaction_use_cases.dart';
 import '../../../routes/app_pages.dart';
 import 'home_expense_chart_item.dart';
@@ -34,6 +35,8 @@ class HomeController extends GetxController {
     required this.getTransactionsUseCase,
     required this.createInvoicePaymentUseCase,
     this.loadGoalsUseCase,
+    this.getMySubscriptionUseCase,
+    this.syncStoredUserSubscriptionUseCase,
     required this.invoicePaymentValidator,
     required this.dashboardRefreshNotifier,
     required this.homeTabNavigation,
@@ -50,6 +53,8 @@ class HomeController extends GetxController {
   final GetTransactionsUseCase getTransactionsUseCase;
   final CreateInvoicePaymentUseCase createInvoicePaymentUseCase;
   final LoadGoalsUseCase? loadGoalsUseCase;
+  final GetMySubscriptionUseCase? getMySubscriptionUseCase;
+  final SyncStoredUserSubscriptionUseCase? syncStoredUserSubscriptionUseCase;
   final InvoicePaymentValidator invoicePaymentValidator;
   final DashboardRefreshNotifier dashboardRefreshNotifier;
   final HomeTabNavigation homeTabNavigation;
@@ -90,6 +95,7 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     _loadUserData();
+    unawaited(_refreshStoredSubscription());
     loadDashboardData();
     _setupSocketListeners();
     unawaited(_checkForAppUpdate());
@@ -208,6 +214,50 @@ class HomeController extends GetxController {
         if (user != null) {
           userName.value = user.name;
         }
+      },
+    );
+  }
+
+  Future<void> _refreshStoredSubscription() async {
+    final getMySubscriptionUseCase = this.getMySubscriptionUseCase;
+    final syncStoredUserSubscriptionUseCase =
+        this.syncStoredUserSubscriptionUseCase;
+    if (getMySubscriptionUseCase == null ||
+        syncStoredUserSubscriptionUseCase == null) {
+      return;
+    }
+
+    final currentUserResult = getStoredUserUseCase();
+    final currentUser = currentUserResult.fold((failure) {
+      debugPrint(
+        '[HomeController] Erro ao carregar usuario para assinatura: ${failure.message}',
+      );
+      return null;
+    }, (user) => user);
+
+    if (currentUser == null ||
+        currentUser.activeSubscription?.grantsAccess == true) {
+      return;
+    }
+
+    final liveResult = await getMySubscriptionUseCase();
+    await liveResult.fold<Future<void>>(
+      (failure) async {
+        debugPrint(
+          '[HomeController] Erro ao sincronizar assinatura: ${failure.message}',
+        );
+      },
+      (liveSubscription) async {
+        final syncResult = await syncStoredUserSubscriptionUseCase(
+          activeSubscription: liveSubscription,
+          subscriptions: currentUser.subscriptions,
+        );
+        syncResult.fold(
+          (failure) => debugPrint(
+            '[HomeController] Erro ao atualizar cache da assinatura: ${failure.message}',
+          ),
+          (_) {},
+        );
       },
     );
   }

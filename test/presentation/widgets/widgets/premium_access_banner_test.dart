@@ -14,11 +14,12 @@ void main() {
     );
 
     expect(find.text('PREMIUM'), findsOneWidget);
-    expect(find.text('Assinatura premium'), findsOneWidget);
-    expect(find.text('Liberar recursos premium do app'), findsOneWidget);
-    expect(find.text('Manter sua experiencia ativa'), findsOneWidget);
-    expect(find.text('Escolher um plano de assinatura'), findsOneWidget);
-    expect(find.text('VER ASSINATURA'), findsOneWidget);
+    expect(find.text('7 dias grátis'), findsOneWidget);
+    expect(find.text('Escolha seu plano'), findsOneWidget);
+    expect(find.text('Mensal'), findsOneWidget);
+    expect(find.text('Anual'), findsOneWidget);
+    expect(find.text('COMEÇAR TESTE GRÁTIS'), findsOneWidget);
+    expect(find.text('Ver planos'), findsOneWidget);
   });
 
   testWidgets('renderiza sem overflow em largura compacta', (tester) async {
@@ -26,7 +27,7 @@ void main() {
     final previousOnError = FlutterError.onError;
     FlutterError.onError = errors.add;
 
-    await tester.binding.setSurfaceSize(const Size(320, 640));
+    await tester.binding.setSurfaceSize(const Size(320, 568));
     await tester.pumpWidget(
       GetMaterialApp(
         theme: AppTheme.dark,
@@ -44,5 +45,6 @@ void main() {
       ),
       isEmpty,
     );
+    expect(find.byType(Scrollable), findsNothing);
   });
 }
