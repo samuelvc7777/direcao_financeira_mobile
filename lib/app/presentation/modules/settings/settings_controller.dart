@@ -11,11 +11,9 @@ import '../../../core/feedback/app_snackbar.dart';
 import '../../../core/notifications/notification_permission_service.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../domain/entities/subscription_entity.dart';
 import '../../../domain/entities/user_entity.dart';
 import '../../../domain/usecases/auth_session_use_cases.dart';
 import '../../../domain/usecases/invoice_notification_use_cases.dart';
-import '../../../domain/usecases/subscription_use_cases.dart';
 import '../costs_gains_settings/costs_gains_flow_coordinator.dart';
 import '../../../routes/app_pages.dart';
 
@@ -26,8 +24,6 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     required this.getStoredUserUseCase,
     required this.logoutUseCase,
     required this.updateProfilePhotoUseCase,
-    this.getMySubscriptionUseCase,
-    this.syncStoredUserSubscriptionUseCase,
     this.setInvoiceNotificationsEnabledUseCase,
     NotificationPermissionService? notificationPermissionService,
     ImagePicker? imagePicker,
@@ -43,8 +39,6 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   final GetStoredUserUseCase getStoredUserUseCase;
   final LogoutUseCase logoutUseCase;
   final UpdateProfilePhotoUseCase updateProfilePhotoUseCase;
-  final GetMySubscriptionUseCase? getMySubscriptionUseCase;
-  final SyncStoredUserSubscriptionUseCase? syncStoredUserSubscriptionUseCase;
   final SetInvoiceNotificationsEnabledUseCase?
   setInvoiceNotificationsEnabledUseCase;
   final NotificationPermissionService _notificationPermissionService;
@@ -64,11 +58,6 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   final userName = 'Samuel Vitor'.obs;
   final userEmail = 'samuelvitorcarvalho717@gmail.com'.obs;
   final profilePhotoBase64 = RxnString();
-  final planName = 'Plano Anual'.obs;
-  final planStatus = 'Ativo'.obs;
-  final remainingDays = 361.obs;
-  final planProgress = 0.99.obs;
-  final isSubscriptionRefreshing = false.obs;
   final isProfilePhotoSaving = false.obs;
 
   final sections = <SettingsSection>[
@@ -196,7 +185,6 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _loadUser() async {
-    isSubscriptionRefreshing.value = true;
     final result = getStoredUserUseCase();
     result.fold(
       (failure) => debugPrint(
@@ -204,56 +192,14 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
       ),
       (user) {
         if (user == null) {
-          planName.value = 'Sem plano ativo';
-          planStatus.value = 'Inativo';
-          remainingDays.value = 0;
-          planProgress.value = 0;
           return;
         }
 
         userName.value = user.name;
         userEmail.value = user.email;
         profilePhotoBase64.value = user.profilePhotoBase64;
-        _loadSubscription(user.activeSubscription);
       },
     );
-
-    final currentUserResult = getStoredUserUseCase();
-    final currentUser = currentUserResult.fold<UserEntity?>(
-      (_) => null,
-      (user) => user,
-    );
-    final shouldRefreshSubscription =
-        currentUser?.activeSubscription == null ||
-        currentUser?.activeSubscription?.status.toUpperCase() != 'ACTIVE';
-
-    if (!shouldRefreshSubscription ||
-        getMySubscriptionUseCase == null ||
-        syncStoredUserSubscriptionUseCase == null) {
-      isSubscriptionRefreshing.value = false;
-      return;
-    }
-
-    planName.value = 'Sincronizando assinatura';
-    planStatus.value = 'Carregando...';
-    remainingDays.value = 0;
-    planProgress.value = 0;
-
-    final liveResult = await getMySubscriptionUseCase!();
-    await liveResult.fold<Future<void>>(
-      (_) async {
-        _loadSubscription(currentUser?.activeSubscription);
-      },
-      (liveSubscription) async {
-        await syncStoredUserSubscriptionUseCase!(
-          activeSubscription: liveSubscription,
-          subscriptions: currentUser?.subscriptions,
-        );
-        _loadSubscription(liveSubscription);
-      },
-    );
-
-    isSubscriptionRefreshing.value = false;
   }
 
   Future<void> pickProfilePhoto() async {
@@ -300,61 +246,11 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  void _loadSubscription(SubscriptionEntity? subscription) {
-    if (subscription == null) {
-      planName.value = 'Sem plano ativo';
-      planStatus.value = 'Inativo';
-      remainingDays.value = 0;
-      planProgress.value = 0;
-      return;
-    }
-
-    final plan = subscription.plan;
-    planName.value = plan?.name ?? 'Plano atual';
-    planStatus.value = _formatStatus(subscription.status);
-
-    final now = DateTime.now();
-    final endDate = subscription.endDate;
-    final startDate = subscription.startDate;
-    final durationDays = plan?.durationDays ?? 0;
-
-    if (endDate != null) {
-      final normalizedNow = DateTime(now.year, now.month, now.day);
-      final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
-      final days = normalizedEnd.difference(normalizedNow).inDays;
-      remainingDays.value = days < 0 ? 0 : days;
-    } else {
-      remainingDays.value = durationDays;
-    }
-
-    if (startDate != null && endDate != null && endDate.isAfter(startDate)) {
-      final total = endDate.difference(startDate).inSeconds;
-      final elapsed = now.isAfter(startDate)
-          ? now.difference(startDate).inSeconds
-          : 0;
-      final ratio = total <= 0 ? 0.0 : elapsed / total;
-      planProgress.value = ratio.clamp(0.0, 1.0);
-      return;
-    }
-
-    if (durationDays > 0 && remainingDays.value > 0) {
-      final consumedRatio = 1 - (remainingDays.value / durationDays);
-      planProgress.value = consumedRatio.clamp(0.0, 1.0);
-      return;
-    }
-
-    planProgress.value = subscription.status.toUpperCase() == 'ACTIVE'
-        ? 1.0
-        : 0.0;
-  }
-
   void toggleTheme(bool value) {
     isDarkModeEnabled.value = value;
     Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
     preferences.writeBool('isDarkMode', value);
   }
-
-  void openSubscription() => Get.toNamed(AppRoutes.subscription);
 
   Future<void> toggleAppBubble(bool value) async {
     if (isAppBubbleBusy.value) return;
@@ -551,22 +447,6 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     );
   }
 
-  String _formatStatus(String status) {
-    switch (status.toUpperCase()) {
-      case 'ACTIVE':
-        return 'Ativo';
-      case 'CANCELED':
-        return 'Cancelado';
-      case 'EXPIRED':
-        return 'Expirado';
-      case 'PENDING':
-        return 'Pendente';
-      case 'TRIAL':
-        return 'Teste';
-      default:
-        return status;
-    }
-  }
 }
 
 class SettingsSection {

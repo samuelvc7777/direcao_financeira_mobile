@@ -73,91 +73,10 @@ class SettingsProfileCard extends StatelessWidget {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: colorScheme.primary.withValues(alpha: 0.15),
-                          ),
-                        ),
-                        child: Text(
-                          controller.planStatus.value,
-                          style: TextStyle(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        controller.planName.value,
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${controller.remainingDays.value} dias restantes',
-                        style: TextStyle(
-                          color: colorScheme.onSurface.withValues(alpha: 0.7),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: controller.openSubscription,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colorScheme.primary,
-                    side: BorderSide(
-                      color: colorScheme.primary.withValues(alpha: 0.34),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                  label: const Text('Ver plano'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: controller.planProgress.value,
-                minHeight: 6,
-                backgroundColor: colorScheme.onSurface.withValues(alpha: 0.08),
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.sand),
-              ),
             ),
           ],
         ),

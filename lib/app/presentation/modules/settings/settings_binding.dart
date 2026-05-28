@@ -4,8 +4,6 @@ import '../../../core/app_bubble/app_bubble_service.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../../domain/repositories/i_auth_repository.dart';
 import '../../../domain/usecases/auth_session_use_cases.dart';
-import '../../../domain/repositories/i_subscription_repository.dart';
-import '../../../domain/usecases/subscription_use_cases.dart';
 import 'settings_controller.dart';
 
 class SettingsBinding extends Bindings {
@@ -29,21 +27,6 @@ class SettingsBinding extends Bindings {
         fenix: true,
       );
     }
-    if (!Get.isRegistered<GetMySubscriptionUseCase>()) {
-      Get.lazyPut(
-        () => GetMySubscriptionUseCase(Get.find<ISubscriptionRepository>()),
-        fenix: true,
-      );
-    }
-    if (!Get.isRegistered<SyncStoredUserSubscriptionUseCase>()) {
-      Get.lazyPut(
-        () => SyncStoredUserSubscriptionUseCase(
-          Get.find<ISubscriptionRepository>(),
-        ),
-        fenix: true,
-      );
-    }
-
     if (!Get.isRegistered<SettingsController>()) {
       Get.lazyPut<SettingsController>(
         () => SettingsController(
@@ -52,9 +35,6 @@ class SettingsBinding extends Bindings {
           getStoredUserUseCase: Get.find<GetStoredUserUseCase>(),
           logoutUseCase: Get.find<LogoutUseCase>(),
           updateProfilePhotoUseCase: Get.find<UpdateProfilePhotoUseCase>(),
-          getMySubscriptionUseCase: Get.find<GetMySubscriptionUseCase>(),
-          syncStoredUserSubscriptionUseCase:
-              Get.find<SyncStoredUserSubscriptionUseCase>(),
         ),
         fenix: true,
       );

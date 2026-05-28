@@ -11,8 +11,6 @@ import '../presentation/modules/initial/initial_view.dart';
 import '../presentation/modules/initial/initial_binding.dart';
 import '../presentation/modules/settings/settings_binding.dart';
 import '../presentation/modules/settings/settings_view.dart';
-import '../presentation/modules/subscription/subscription_binding.dart';
-import '../presentation/modules/subscription/subscription_view.dart';
 import '../presentation/modules/categories/categories_binding.dart';
 import '../presentation/modules/categories/categories_view.dart';
 
@@ -55,7 +53,6 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String initial = '/initial';
   static const String settings = '/settings';
-  static const String subscription = '/subscription';
   static const String categories = '/categories';
   static const String bankAccounts = '/bank-accounts';
   static const String creditCards = '/credit-cards';
@@ -166,13 +163,6 @@ class AppPages {
       name: AppRoutes.settings,
       page: () => const SettingsView(),
       binding: SettingsBinding(),
-      transition: Transition.rightToLeft,
-      transitionDuration: const Duration(milliseconds: 300),
-    ),
-    GetPage(
-      name: AppRoutes.subscription,
-      page: () => const SubscriptionView(),
-      binding: SubscriptionBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

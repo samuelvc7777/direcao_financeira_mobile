@@ -394,8 +394,6 @@ class HomeController extends GetxController {
     await appUpdateService.openStorePage();
   }
 
-  void openSubscription() => Get.toNamed(AppRoutes.subscription);
-
   void openGoals() => Get.toNamed(AppRoutes.goals);
 
   Future<void> logout() async {
