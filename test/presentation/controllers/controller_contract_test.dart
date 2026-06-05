@@ -1967,6 +1967,47 @@ void main() {
   );
 
   test(
+    'JourneyController nao mostra banner offline sem turno ativo ou pendencias',
+    () async {
+      final journeyRepository = _FakeJourneyRepository()
+        ..shiftHistoryResult = Right(
+          PagedResultEntity(
+            items: [buildJourneyShiftVariant(index: 1, isPendingSync: false)],
+            totalCount: 1,
+            offset: 0,
+            limit: 20,
+          ),
+        )
+        ..trackingStatusResult = Right(buildTrackingStatus());
+      final rideRepository = _FakeRideRepository();
+      final accessibilityService = _FakeAccessibilityService();
+      final journeyRealtimeBridge = _FakeJourneyRealtimeBridge();
+      final appBubbleService = _FakeAppBubbleService();
+      final controller = _buildJourneyController(
+        journeyRepository: journeyRepository,
+        rideRepository: rideRepository,
+        accessibilityService: accessibilityService,
+        journeyRealtimeBridge: journeyRealtimeBridge,
+        appBubbleService: appBubbleService,
+      );
+
+      controller.onInit();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      journeyRealtimeBridge.isOnline.value = false;
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.hasActiveShift, isFalse);
+      expect(controller.pendingShiftSyncCount.value, 0);
+      expect(controller.bannerMessage, isNull);
+
+      controller.onClose();
+      await journeyRepository.dispose();
+    },
+  );
+
+  test(
     'JourneyController expone banner de tracking e erro normalizado dos blocos de carga',
     () async {
       final journeyRepository = _FakeJourneyRepository()

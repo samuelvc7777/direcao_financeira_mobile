@@ -30,14 +30,18 @@ class SupabaseRealtimeClient implements RealtimeClient {
   StreamSubscription<List<Map<String, dynamic>>>? _transactionsSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _shiftsSubscription;
   StreamSubscription<List<Map<String, dynamic>>>? _ridesSubscription;
+  Timer? _reconnectTimer;
   bool _isConnected = false;
   bool _isRecoveringFromStreamError = false;
+  bool _isDisposed = false;
+  bool _manualDisconnect = false;
 
   @override
   RxBool get isOnline => _isOnline;
 
   @override
   void connect({required String token}) {
+    _manualDisconnect = false;
     if (!enableRealtime || _isConnected) {
       _isOnline.value = client.auth.currentSession != null;
       return;
@@ -57,6 +61,8 @@ class SupabaseRealtimeClient implements RealtimeClient {
 
   @override
   void disconnect() {
+    _manualDisconnect = true;
+    _reconnectTimer?.cancel();
     _isConnected = false;
     _isOnline.value = false;
     unawaited(_disposeStreams());
@@ -86,6 +92,8 @@ class SupabaseRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> dispose() async {
+    _isDisposed = true;
+    _reconnectTimer?.cancel();
     _handlers.clear();
     await _disposeStreams();
   }
@@ -182,9 +190,29 @@ class SupabaseRealtimeClient implements RealtimeClient {
       _isConnected = false;
       _isOnline.value = false;
       await _disposeStreams();
+      _scheduleReconnect();
     } finally {
       _isRecoveringFromStreamError = false;
     }
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisposed || _manualDisconnect || !enableRealtime) {
+      return;
+    }
+
+    final session = client.auth.currentSession;
+    if (session == null) {
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+      if (_isDisposed || _manualDisconnect) {
+        return;
+      }
+      connect(token: session.accessToken);
+    });
   }
 
   void _emit(String event, [dynamic payload]) {

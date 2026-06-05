@@ -339,7 +339,7 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
   }
 
   String? get bannerMessage {
-    if (!isOnline) {
+    if (!isOnline && (hasActiveShift || pendingShiftSyncCount.value > 0)) {
       return 'Voce esta offline. O turno continua funcionando no aparelho e sera sincronizado quando a internet voltar.';
     }
 

@@ -507,6 +507,8 @@ class ScreenReaderService : AccessibilityService() {
             normalizeFingerprintValue(offerData["km_total"]?.toString()),
             normalizeFingerprintValue(offerData["minutos_total"]?.toString()),
             normalizeFingerprintValue(offerData["passenger_name"]?.toString()),
+            normalizeFingerprintValue(offerData["origin_address"]?.toString()),
+            normalizeFingerprintValue(offerData["destination_address"]?.toString()),
         ).joinToString("|")
     }
 

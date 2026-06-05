@@ -331,6 +331,79 @@ class MoveSjParserTest {
     }
 
     @Test
+    fun `ocr posicional da movesj nao usa rotulos do mapa como nome do passageiro`() {
+        val ocrLines =
+            listOf(
+                MoveSjParser.OcrLine("Move", 49, 62, 174, 122),
+                MoveSjParser.OcrLine("RECUSAR", 168, 219, 343, 255),
+                MoveSjParser.OcrLine("FABRICAS", 28, 318, 196, 350),
+                MoveSjParser.OcrLine("MATOZINHOS", 34, 368, 250, 402),
+                MoveSjParser.OcrLine("PONTE", 76, 430, 190, 462),
+                MoveSjParser.OcrLine("R$ 12,66", 423, 408, 709, 480),
+                MoveSjParser.OcrLine("(Motorista)", 787, 388, 998, 423),
+                MoveSjParser.OcrLine("R$ 12,66", 772, 453, 1009, 501),
+                MoveSjParser.OcrLine("1,5 km (R$ 8,61/km)", 421, 535, 866, 574),
+                MoveSjParser.OcrLine("4 min (R$ 2,98/min)", 421, 603, 867, 641),
+                MoveSjParser.OcrLine("Larissa 5,00★", 146, 631, 350, 664),
+                MoveSjParser.OcrLine("0 m (1 min)", 85, 731, 297, 765),
+                MoveSjParser.OcrLine("R. Joaquim Portugal, 15 - Matozinhos, Sao", 37, 794, 1011, 832),
+                MoveSjParser.OcrLine("Joao del Rei - MG, 36305-174, Brasil", 37, 855, 818, 892),
+                MoveSjParser.OcrLine("1,5 km (4 min)", 85, 942, 353, 978),
+                MoveSjParser.OcrLine("Av. Leite de Castro, 617 - Fabricas, Sao Joao", 37, 1004, 1040, 1041),
+                MoveSjParser.OcrLine("del Rei - MG, 36301-182, Brasil", 37, 1065, 697, 1102),
+                MoveSjParser.OcrLine("ACEITAR (12)", 363, 1256, 594, 1290),
+            ).shuffled()
+
+        val offerData =
+            parser.parsePositionedOcrOffer(
+                rawText = ocrLines.joinToString("\n") { it.text },
+                ocrLines = ocrLines,
+            )!!
+
+        assertEquals("Larissa", offerData["passenger_name"])
+        assertEquals("5,00", offerData["avaliacao"])
+        assertEquals("R$ 12,66", offerData["valor_bruto"])
+    }
+
+    @Test
+    fun `ocr da movesj preserva destino longo quebrado em quatro linhas`() {
+        val lines =
+            listOf(
+                "Move",
+                "Deslize para recusar",
+                "Samuel",
+                "5,00★",
+                "R$ 13,40",
+                "(Motorista)",
+                "R$ 13,40",
+                "1,7 km (R$ 7,92/km)",
+                "5 min (R$ 2,67/min)",
+                "2 m (1 min)",
+                "R. Getulio Vargas, 989 - A Definir, Santa Cruz",
+                "de Minas - MG, 36302-142, Brasil",
+                "1,7 km (5 min)",
+                "Independente Esporte Clube - Avenida",
+                "Domingos Pinto Camarano - Colonia",
+                "do Marcal, Sao Joao del Rei - MG, CEP",
+                "36302004, Brasil",
+                "Deslize para aceitar (4)",
+            )
+
+        val offerData = parser.parseOcrOffer(lines.joinToString("\n"), lines)!!
+
+        assertEquals("Samuel", offerData["passenger_name"])
+        assertEquals("R$ 13,40", offerData["valor_bruto"])
+        assertEquals(
+            "R. Getulio Vargas, 989 - A Definir, Santa Cruz de Minas - MG, 36302-142, Brasil",
+            offerData["origin_address"],
+        )
+        assertEquals(
+            "Independente Esporte Clube - Avenida Domingos Pinto Camarano - Colonia do Marcal, Sao Joao del Rei - MG, CEP 36302004, Brasil",
+            offerData["destination_address"],
+        )
+    }
+
+    @Test
     fun `resolve valor principal ignorando linhas derivadas por km e por min`() {
         val lines =
             listOf(

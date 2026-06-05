@@ -355,6 +355,38 @@ class MoveSjParser {
         return resolveBestPriceText(ocrLines.map { it.text }, rawText)
     }
 
+    private fun resolveBestPriceLine(ocrLines: List<OcrLine>): OcrLine? {
+        val normalizedLines = normalizeOcrLines(ocrLines)
+        val firstMetricTop =
+            normalizedLines
+                .filter { isOfferMetricContextLine(it.text) }
+                .minOfOrNull { it.top }
+                ?: Int.MAX_VALUE
+        val pageWidth = inferPageWidth(normalizedLines)
+
+        return normalizedLines
+            .mapNotNull { line ->
+                val price = priceRegex.find(line.text)?.value ?: return@mapNotNull null
+                PriceCandidate(
+                    price = price,
+                    line = line,
+                    area = (line.right - line.left) * (line.bottom - line.top),
+                    isDerived = isDerivedMetricPriceLine(line.text),
+                    isPriceOnly = priceRegex.matches(line.text.trim()),
+                    isBeforeMetrics = line.bottom <= firstMetricTop,
+                    distanceToCenter = abs(line.centerX - (pageWidth / 2)),
+                )
+            }.sortedWith(
+                compareByDescending<PriceCandidate> { if (it.isBeforeMetrics && !it.isDerived) 1 else 0 }
+                    .thenByDescending { if (it.isPriceOnly) 1 else 0 }
+                    .thenByDescending { it.area }
+                    .thenBy { it.distanceToCenter }
+                    .thenBy { it.line.top },
+            )
+            .firstOrNull { !it.isDerived }
+            ?.line
+    }
+
     private fun extractPriceFromCandidateLine(line: String): String? {
         if (isDerivedMetricPriceLine(line)) {
             return null
@@ -382,7 +414,7 @@ class MoveSjParser {
         return ocrLines.firstOrNull { line ->
             line.centerX < pageWidth * 0.45f &&
                 (ratingRegex.containsMatchIn(line.text) || ratingValueRegex.matches(line.text.trim()))
-        }?.text
+        }?.text?.let(::extractRatingTextFromLine)
     }
 
     private fun normalizeVisibleTexts(lines: List<String>): List<String> {
@@ -432,6 +464,20 @@ class MoveSjParser {
 
     private fun extractPassengerNameFromOcrLines(lines: List<OcrLine>): String? {
         val pageWidth = inferPageWidth(lines)
+        val firstRouteTop = firstRouteTop(lines)
+        val refuseBottom =
+            lines
+                .filter { normalizedText(it.text).contains("recusar") }
+                .maxOfOrNull { it.bottom }
+        val mainPriceLine = resolveBestPriceLine(lines)
+        val cardTop =
+            listOfNotNull(refuseBottom, mainPriceLine?.top?.minus(80))
+                .minOrNull()
+                ?: 0
+        val cardBottom =
+            listOf(firstRouteTop, mainPriceLine?.bottom?.plus(260) ?: Int.MAX_VALUE)
+                .minOrNull()
+                ?: firstRouteTop
         val firstMetricTop =
             lines.firstOrNull { offerDistanceRegex.containsMatchIn(it.text) || offerMinutesRegex.containsMatchIn(it.text) }
                 ?.top
@@ -439,33 +485,59 @@ class MoveSjParser {
 
         val ratingLine =
             lines.firstOrNull { line ->
-                line.centerX < pageWidth * 0.45f &&
+                isInsidePassengerCardArea(line, pageWidth, cardTop, cardBottom) &&
                     (ratingRegex.containsMatchIn(line.text) || ratingValueRegex.matches(line.text.trim()))
             }
 
         if (ratingLine != null) {
+            passengerCandidateName(ratingLine.text)?.let { return it }
+
             lines
-                .filter { it.bottom <= ratingLine.top && it.centerX < pageWidth * 0.45f }
+                .filter { it.bottom <= ratingLine.top && isInsidePassengerCardArea(it, pageWidth, cardTop, cardBottom) }
                 .sortedByDescending { it.top }
-                .firstOrNull { isPassengerCandidate(it.text) }
-                ?.let { return it.text }
+                .firstNotNullOfOrNull { passengerCandidateName(it.text) }
+                ?.let { return it }
+        }
+
+        lines
+            .filter { isInsidePassengerCardArea(it, pageWidth, cardTop, cardBottom) }
+            .sortedWith(compareBy<OcrLine> { it.top }.thenBy { it.left })
+            .firstNotNullOfOrNull { passengerCandidateName(it.text) }
+            ?.let { return it }
+
+        if (firstMetricTop < Int.MAX_VALUE) {
+            lines
+                .filter {
+                    it.centerX < pageWidth * 0.45f &&
+                        it.top >= cardTop &&
+                        it.top < firstMetricTop
+                }
+                .sortedByDescending { it.top }
+                .firstNotNullOfOrNull { passengerCandidateName(it.text) }
+                ?.let { return it }
         }
 
         return lines
-            .filter { it.centerX < pageWidth * 0.45f && it.top < firstRouteTop(lines) }
+            .filter { it.centerX < pageWidth * 0.45f && it.top >= cardTop && it.top < firstRouteTop }
             .sortedByDescending { it.top }
-            .firstOrNull { isPassengerCandidate(it.text) }
-            ?.text
+            .firstNotNullOfOrNull { passengerCandidateName(it.text) }
     }
 
     private fun isPassengerCandidate(line: String): Boolean {
+        return passengerCandidateName(line) != null
+    }
+
+    private fun passengerCandidateName(line: String): String? {
+        val candidate = stripRatingFromPassengerCandidate(line)
         val normalized = normalizedText(line)
-        return line.length in 3..30 &&
-            line.any { it.isLetter() } &&
-            !line.contains(",") &&
-            !line.any { it.isDigit() } &&
+        val candidateNormalized = normalizedText(candidate)
+        return candidate.takeIf {
+            candidate.length in 3..30 &&
+            candidate.any { it.isLetter() } &&
+            !candidate.contains(",") &&
+            !candidate.any { it.isDigit() } &&
             !normalized.contains("deslize") &&
-            !isRouteMetricLine(line) &&
+            !isRouteMetricLine(candidate) &&
             !normalized.contains("r$") &&
             !normalized.contains("aceitar") &&
             !normalized.contains("recusar") &&
@@ -478,9 +550,29 @@ class MoveSjParser {
             !normalized.contains("corrida") &&
             !normalized.contains("motorista") &&
             !normalized.contains("sao joao") &&
+            !candidateNormalized.contains("matozinhos") &&
+            !candidateNormalized.contains("fabricas") &&
             !normalized.contains("centro") &&
-            !ratingRegex.containsMatchIn(line) &&
-            !ratingValueRegex.matches(line.trim())
+            !ratingValueRegex.matches(candidate.trim())
+        }
+    }
+
+    private fun stripRatingFromPassengerCandidate(line: String): String {
+        return line
+            .replace(ratingRegex, "")
+            .replace(ratingValueRegex, "")
+            .trim()
+    }
+
+    private fun isInsidePassengerCardArea(
+        line: OcrLine,
+        pageWidth: Int,
+        cardTop: Int,
+        cardBottom: Int,
+    ): Boolean {
+        return line.centerX < pageWidth * 0.45f &&
+            line.top >= cardTop &&
+            line.top < cardBottom
     }
 
     private fun extractAddresses(
@@ -607,8 +699,8 @@ class MoveSjParser {
 
             collected.add(candidate)
 
-            // Endereco da MoveSj costuma vir quebrado em 1 a 3 linhas.
-            if (collected.size >= 3) {
+            // Alguns destinos longos da MoveSj quebram em 4 linhas.
+            if (collected.size >= 4) {
                 break
             }
         }
@@ -660,7 +752,7 @@ class MoveSjParser {
             }
 
             currentBlock.add(line)
-            if (currentBlock.size >= 3) {
+            if (currentBlock.size >= 4) {
                 flushCurrentBlock()
             }
         }
@@ -796,6 +888,11 @@ class MoveSjParser {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?: "5,00"
+    }
+
+    private fun extractRatingTextFromLine(line: String): String? {
+        return ratingRegex.find(line)?.value?.let(::sanitizeRating)
+            ?: line.trim().takeIf { ratingValueRegex.matches(it) }?.let(::sanitizeRating)
     }
 
     private data class MoveSjOfferMetrics(
