@@ -28,15 +28,8 @@ class TrafficLightSettingsModel extends TrafficLightSettingsEntity {
             {'R\$/Km': true, 'R\$/Hora': true, 'Lucro/H': true, 'Nota': true},
       ),
       monitoredApps: Map<String, bool>.from(
-        json['monitoredApps'] ??
-            {
-              'Uber': true,
-              '99': true,
-              'inDrive': true,
-              'MoveSj': true,
-              'MeLevaSJ': false,
-              'GooglePhotos': false,
-            },
+        _defaultMonitoredApps
+          ..addAll(Map<String, bool>.from(json['monitoredApps'] ?? {})),
       ),
       fontSize: (json['fontSize'] ?? 12.0).toDouble(),
       opacity: (json['opacity'] ?? 100.0).toDouble(),
@@ -51,6 +44,15 @@ class TrafficLightSettingsModel extends TrafficLightSettingsEntity {
       passengerRatingCustomized: json['passengerRatingCustomized'] ?? false,
     );
   }
+
+  static Map<String, bool> get _defaultMonitoredApps => {
+    'Uber': true,
+    '99': true,
+    'inDrive': true,
+    'MoveSj': true,
+    'MeLevaSJ': false,
+    'GooglePhotos': false,
+  };
 
   Map<String, dynamic> toJson() {
     return {

@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
     private val locationPermissionsChannelName = "com.direcao_financeira/location_permissions"
     private val invoiceNotificationsChannelName = "com.direcao_financeira/invoice_notifications"
     private val recordingChannelName = "com.direcao_financeira/recording"
+    private val mapsChannelName = "com.direcao_financeira/maps"
     private var backgroundLocationPermissionResult: MethodChannel.Result? = null
     private var recordingPermissionResult: MethodChannel.Result? = null
 
@@ -124,6 +125,22 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "getLocalTimeZoneName" -> result.success(TimeZone.getDefault().id)
                     "openNotificationSettings" -> result.success(openNotificationSettings())
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, mapsChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "openAddress" -> {
+                        val args = call.arguments as? Map<*, *>
+                        val address = args?.get("address")?.toString()?.trim()
+                        if (address.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENTS", "Endereco ausente.", null)
+                            return@setMethodCallHandler
+                        }
+                        result.success(openMapAddress(address))
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -361,6 +378,14 @@ class MainActivity : FlutterActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
+        return runCatching {
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun openMapAddress(address: String): Boolean {
+        val intent = MapsIntentFactory.buildSearchIntent(this, address)
         return runCatching {
             startActivity(intent)
             true

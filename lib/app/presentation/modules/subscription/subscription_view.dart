@@ -636,6 +636,16 @@ class _PlanOptionCard extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                _subscriptionTermsSummary(controller, plan),
+                style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.72),
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               if (controller.usesPlayStoreBilling) ...[
                 const SizedBox(height: 10),
                 _InlineStatus(
@@ -668,6 +678,19 @@ class _SubscribeBottomBar extends StatelessWidget {
       ),
       child: Column(
         children: [
+          Obx(() {
+            final plan = controller.selectedPlan;
+            if (plan == null || !controller.usesPlayStoreBilling) {
+              return const SizedBox.shrink();
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _SubscriptionTermsCard(
+                terms: _subscriptionTermsFull(controller, plan),
+              ),
+            );
+          }),
           Obx(
             () => CustomFilledButton(
               text: controller.ctaLabelForSelectedPlan(),
@@ -831,6 +854,48 @@ class _PlayStoreNote extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionTermsCard extends StatelessWidget {
+  const _SubscriptionTermsCard({required this.terms});
+
+  final String terms;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.amber.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: AppColors.amber,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              terms,
+              style: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.78),
+                fontSize: 12.5,
+                height: 1.42,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1088,4 +1153,49 @@ String _planDescription(PlanEntity? plan) {
   return description.isEmpty
       ? 'Todos os recursos liberados para sua conta.'
       : description;
+}
+
+String _subscriptionTermsSummary(
+  SubscriptionController controller,
+  PlanEntity plan,
+) {
+  final product = controller.storeProductForPlan(plan);
+  final price = controller.planPriceLabel(plan);
+  final cycle = _billingCycleLabel(plan);
+  final trialDays = product?.trialDays;
+
+  if (trialDays != null && trialDays > 0) {
+    return 'Teste grátis por $trialDays dias. Depois, $price a cada $cycle, com renovação automática até cancelar.';
+  }
+
+  return '$price a cada $cycle, com renovação automática até cancelar.';
+}
+
+String _subscriptionTermsFull(
+  SubscriptionController controller,
+  PlanEntity plan,
+) {
+  final product = controller.storeProductForPlan(plan);
+  final price = controller.planPriceLabel(plan);
+  final cycle = _billingCycleLabel(plan);
+  final trialDays = product?.trialDays;
+
+  if (trialDays != null && trialDays > 0) {
+    return 'Teste grátis por $trialDays dias, encerrando $trialDays dias após a ativação. '
+        'Ao final do teste, a assinatura será cobrada automaticamente: $price a cada $cycle. '
+        'Para não ser cobrado, cancele antes do fim do teste na Google Play, em Pagamentos e assinaturas > Assinaturas.';
+  }
+
+  return 'Ao confirmar, a assinatura será cobrada pela Google Play: $price a cada $cycle, com renovação automática. '
+      'Você pode cancelar quando quiser na Google Play, em Pagamentos e assinaturas > Assinaturas.';
+}
+
+String _billingCycleLabel(PlanEntity plan) {
+  if (plan.durationDays >= 360) {
+    return 'ano';
+  }
+  if (plan.durationDays >= 28 && plan.durationDays <= 31) {
+    return 'mês';
+  }
+  return '${plan.durationDays} dias';
 }

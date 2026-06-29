@@ -306,6 +306,19 @@ class TransactionsController extends GetxController {
     return _groupTransactionsByDay(visibleTransactions);
   }
 
+  int get visibleTransactionsCount => visibleTransactions.length;
+
+  String get selectedFilterSummary {
+    switch (selectedFilter.value) {
+      case TransactionsFilter.all:
+        return 'Entradas, saídas, cartões e recorrentes';
+      case TransactionsFilter.income:
+        return 'Somente receitas recebidas no mês';
+      case TransactionsFilter.expense:
+        return 'Somente saídas e pagamentos do mês';
+    }
+  }
+
   List<TransactionsDayGroup> _groupTransactionsByDay(
     List<DisplayedTransactionEntry> source,
   ) {

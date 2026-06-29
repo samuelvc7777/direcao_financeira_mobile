@@ -22,61 +22,13 @@ class TransactionsDayGroupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.theme.colorScheme;
-    final dayLabel = DateFormat('dd/MM/yyyy', 'pt_BR').format(group.date);
-    final totalIsNegative = group.totalCents < 0;
-    final totalLabel = compactAmountFormat.format(group.totalCents.abs() / 100);
+    final dateLabel = _formatGroupDate(group.date);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.violet,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              dayLabel,
-              style: TextStyle(
-                color: colorScheme.onSurface.withValues(alpha: 0.78),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                '${group.transactions.length}',
-                style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.45),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '${totalIsNegative ? '-' : '+'}$totalLabel',
-              style: TextStyle(
-                color: totalIsNegative ? AppColors.rose : AppColors.emerald,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+        _TransactionDateHeader(dateLabel: dateLabel),
+        const SizedBox(height: 10),
         Column(
           children: [
             for (var index = 0; index < group.transactions.length; index++) ...[
@@ -90,6 +42,76 @@ class TransactionsDayGroupSection extends StatelessWidget {
                 const SizedBox(height: 10),
             ],
           ],
+        ),
+      ],
+    );
+  }
+}
+
+String _formatGroupDate(DateTime date) {
+  final today = DateTime.now();
+  final todayOnly = DateTime(today.year, today.month, today.day);
+  final dateOnly = DateTime(date.year, date.month, date.day);
+
+  if (dateOnly == todayOnly) {
+    return 'Hoje, ${DateFormat('dd/MM/yyyy', 'pt_BR').format(date)}';
+  }
+
+  if (dateOnly == todayOnly.subtract(const Duration(days: 1))) {
+    return 'Ontem, ${DateFormat('dd/MM/yyyy', 'pt_BR').format(date)}';
+  }
+
+  final weekday = DateFormat('EEEE', 'pt_BR').format(date);
+  final capitalizedWeekday = weekday.isEmpty
+      ? weekday
+      : '${weekday[0].toUpperCase()}${weekday.substring(1)}';
+  return '$capitalizedWeekday, ${DateFormat('dd/MM/yyyy', 'pt_BR').format(date)}';
+}
+
+class _TransactionDateHeader extends StatelessWidget {
+  const _TransactionDateHeader({required this.dateLabel});
+
+  final String dateLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 13,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                dateLabel,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Divider(
+            height: 1,
+            color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+          ),
         ),
       ],
     );
@@ -118,8 +140,8 @@ class _TransactionFinanceCard extends StatelessWidget {
     final title = _resolveTitle();
     final subtitle = _resolveSubtitle(title);
     final secondaryChipLabel = _resolveSecondaryChipLabel();
-    final timeLabel = DateFormat(
-      'HH:mm',
+    final dateTimeLabel = DateFormat(
+      'dd/MM HH:mm',
       'pt_BR',
     ).format(transaction.transactionDate);
     final amountLabel = amountFormat.format(transaction.displayedAmount);
@@ -129,22 +151,25 @@ class _TransactionFinanceCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? AppColors.midnight : colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: stateColor.withValues(alpha: 0.42)),
+            color: isDark
+                ? stateColor.withValues(alpha: 0.05)
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: stateColor.withValues(alpha: 0.40)),
             boxShadow: [
               BoxShadow(
                 color: colorScheme.shadow.withValues(
-                  alpha: isDark ? 0.22 : 0.12,
+                  alpha: isDark ? 0.20 : 0.08,
                 ),
-                blurRadius: 14,
+                blurRadius: 16,
                 offset: const Offset(0, 8),
+                spreadRadius: -10,
               ),
             ],
           ),
@@ -153,39 +178,38 @@ class _TransactionFinanceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  width: 6,
+                  width: 4,
                   decoration: BoxDecoration(
                     color: stateColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      bottomLeft: Radius.circular(20),
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(18),
                     ),
                   ),
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Container(
-                              width: 42,
-                              height: 42,
+                              width: 38,
+                              height: 38,
                               decoration: BoxDecoration(
                                 color: stateColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(13),
                               ),
                               child: Icon(
                                 _resolveIcon(),
                                 color: stateColor,
-                                size: 22,
+                                size: 20,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,31 +241,22 @@ class _TransactionFinanceCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '$amountPrefix $amountLabel',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: stateColor,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 10),
+                            _AmountPill(
+                              label: '$amountPrefix $amountLabel',
+                              color: stateColor,
+                              icon: transaction.type == TransactionType.expense
+                                  ? Icons.north_east_rounded
+                                  : Icons.south_west_rounded,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         Wrap(
                           spacing: 6,
                           runSpacing: 5,
                           children: [
-                            _TimeLabel(timeLabel: timeLabel),
+                            _DateTimeLabel(dateTimeLabel: dateTimeLabel),
                             _InfoChip(
                               label: _resolveStatusChipLabel(isTransfer),
                               icon: _resolveStatusChipIcon(isTransfer),
@@ -457,10 +472,10 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _TimeLabel extends StatelessWidget {
-  const _TimeLabel({required this.timeLabel});
+class _DateTimeLabel extends StatelessWidget {
+  const _DateTimeLabel({required this.dateTimeLabel});
 
-  final String timeLabel;
+  final String dateTimeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -474,17 +489,61 @@ class _TimeLabel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.schedule_rounded,
+            Icons.event_rounded,
             size: 13,
             color: context.theme.colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 4),
           Text(
-            timeLabel,
+            dateTimeLabel,
             style: TextStyle(
               color: context.theme.colorScheme.onSurface.withValues(alpha: 0.7),
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmountPill extends StatelessWidget {
+  const _AmountPill({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 88),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],

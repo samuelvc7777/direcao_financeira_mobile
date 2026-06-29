@@ -344,8 +344,8 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
         controller.selectedPosition.value == TrafficLightPosition.esquerda ||
         controller.selectedPosition.value == TrafficLightPosition.direita;
     final previewWidth = isSidePosition
-        ? Responsive.hp(context, 31)
-        : Responsive.hp(context, 46);
+        ? Responsive.hp(context, 20)
+        : Responsive.hp(context, 50);
     final monitoredApp = controller.monitoredApps.entries
         .firstWhere(
           (entry) => entry.value,
@@ -355,22 +355,40 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
 
     return Container(
       width: previewWidth,
-      constraints: BoxConstraints(minHeight: Responsive.vp(context, 9.6)),
-      padding: EdgeInsets.all(Responsive.sp(context, 11)),
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.sp(context, isSidePosition ? 8 : 10),
+        vertical: Responsive.sp(context, isSidePosition ? 9 : 10),
+      ),
       decoration: BoxDecoration(
         color: previewTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(Responsive.sp(context, 18)),
+        borderRadius: isSidePosition
+            ? BorderRadius.only(
+                topLeft:
+                    controller.selectedPosition.value ==
+                        TrafficLightPosition.direita
+                    ? Radius.circular(Responsive.sp(context, 16))
+                    : Radius.zero,
+                bottomLeft:
+                    controller.selectedPosition.value ==
+                        TrafficLightPosition.direita
+                    ? Radius.circular(Responsive.sp(context, 16))
+                    : Radius.zero,
+                topRight:
+                    controller.selectedPosition.value ==
+                        TrafficLightPosition.esquerda
+                    ? Radius.circular(Responsive.sp(context, 16))
+                    : Radius.zero,
+                bottomRight:
+                    controller.selectedPosition.value ==
+                        TrafficLightPosition.esquerda
+                    ? Radius.circular(Responsive.sp(context, 16))
+                    : Radius.zero,
+              )
+            : BorderRadius.circular(Responsive.sp(context, 18)),
         border: Border.all(
           color: signalColor,
           width: Responsive.sp(context, 4),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: Responsive.sp(context, 16),
-            offset: Offset(0, Responsive.sp(context, 6)),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -381,7 +399,7 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: activeIndicators.map((name) {
                 return Padding(
-                  padding: EdgeInsets.only(bottom: Responsive.vp(context, 0.8)),
+                  padding: EdgeInsets.only(bottom: Responsive.vp(context, 0.7)),
                   child: _buildMockMetric(
                     context,
                     label: _overlayMetricLabel(name),
@@ -421,26 +439,28 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
                   )
                   .toList(),
             ),
-          SizedBox(height: Responsive.vp(context, 1.3)),
+          SizedBox(height: Responsive.vp(context, isSidePosition ? 0.7 : 0.8)),
           Row(
             children: [
               Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: Responsive.sp(context, 8),
-                  vertical: Responsive.sp(context, 4),
+                  vertical: Responsive.sp(context, isSidePosition ? 3 : 3),
                 ),
                 decoration: BoxDecoration(
                   color: previewTheme.badgeBackgroundColor,
                   borderRadius: BorderRadius.circular(
-                    Responsive.sp(context, 6),
+                    Responsive.sp(context, 4),
                   ),
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: Responsive.hp(context, isSidePosition ? 16 : 12),
+                    maxWidth: Responsive.hp(context, isSidePosition ? 9 : 12),
                   ),
                   child: Text(
-                    controller.displayMonitoredAppLabel(monitoredApp).toUpperCase(),
+                    controller
+                        .displayMonitoredAppLabel(monitoredApp)
+                        .toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -455,19 +475,22 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
                   ),
                 ),
               ),
-              SizedBox(width: Responsive.sp(context, 8)),
-              Expanded(
+              SizedBox(width: Responsive.sp(context, isSidePosition ? 5 : 6)),
+              Flexible(
                 child: Text(
-                  '${_formatDuration(controller.cardDuration.value.toInt())} - 18.3km',
-                  maxLines: 1,
+                  isSidePosition
+                      ? '${_formatDuration(controller.cardDuration.value.toInt())}\n18.3km'
+                      : '${_formatDuration(controller.cardDuration.value.toInt())} - 18.3km',
+                  maxLines: isSidePosition ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: previewTheme.primaryTextColor,
                     fontSize: Responsive.sp(
                       context,
-                      _scaledFont(baseFontSize, 0.58),
+                      _scaledFont(baseFontSize, isSidePosition ? 0.45 : 0.55),
                     ),
                     fontWeight: FontWeight.w700,
+                    height: isSidePosition ? 1.05 : null,
                   ),
                 ),
               ),
@@ -483,7 +506,7 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
     TrafficLightPosition position,
     Widget child,
   ) {
-    final horizontal = Responsive.hp(context, 2);
+    final horizontal = Responsive.hp(context, 0);
     final vertical = Responsive.vp(context, 2);
 
     switch (position) {
@@ -516,57 +539,60 @@ class _PreviewCard extends GetView<TrafficLightSettingsController> {
     required _TrafficLightPreviewTheme theme,
     required double baseFontSize,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    final isSidePosition =
+        controller.selectedPosition.value == TrafficLightPosition.esquerda ||
+        controller.selectedPosition.value == TrafficLightPosition.direita;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.max,
       children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: theme.labelColor,
-            fontSize: Responsive.sp(context, _scaledFont(baseFontSize, 0.42)),
-            fontWeight: FontWeight.w500,
+        Container(
+          width: Responsive.sp(context, 4),
+          height: Responsive.sp(context, isSidePosition ? 22 : 22),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(Responsive.sp(context, 5)),
           ),
         ),
-        SizedBox(height: Responsive.vp(context, 0.35)),
-        Row(
-          mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: Responsive.sp(context, 4),
-              height: Responsive.sp(context, 21),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(Responsive.sp(context, 6)),
+        SizedBox(width: Responsive.sp(context, isSidePosition ? 6 : 7)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: theme.labelColor,
+                  fontSize: Responsive.sp(
+                    context,
+                    _scaledFont(baseFontSize, isSidePosition ? 0.4 : 0.42),
+                  ),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            SizedBox(width: Responsive.sp(context, 6)),
-            Expanded(
-              child: Align(
+              FittedBox(
+                fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    value,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: Responsive.sp(
-                        context,
-                        _scaledFont(baseFontSize, 0.74),
-                      ),
-                      fontWeight: FontWeight.w800,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: Responsive.sp(
+                      context,
+                      _scaledFont(baseFontSize, isSidePosition ? 0.9 : 0.9),
                     ),
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -749,10 +775,10 @@ class _TrafficLightPreviewTheme {
         );
       case TrafficLightTheme.verde:
         return _TrafficLightPreviewTheme(
-          backgroundColor: const Color(0xFFEAF8F0),
-          primaryTextColor: const Color(0xFF0B2F1D),
-          labelColor: const Color(0xFF3D6B57),
-          badgeBackgroundColor: const Color(0xFF0B2F1D),
+          backgroundColor: const Color(0xFFA7EFC0),
+          primaryTextColor: Colors.black,
+          labelColor: Colors.black,
+          badgeBackgroundColor: Colors.black,
           badgeTextColor: Colors.white,
         );
     }

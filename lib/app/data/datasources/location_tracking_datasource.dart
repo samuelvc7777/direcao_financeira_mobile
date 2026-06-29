@@ -52,10 +52,7 @@ class LocationTrackingDataSourceImpl implements ILocationTrackingDataSource {
       );
     }
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
+    final permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
       return const LocationTrackingStatusModel(
@@ -106,10 +103,6 @@ class LocationTrackingDataSourceImpl implements ILocationTrackingDataSource {
         issueMessage:
             'Troque para localizacao precisa para rastrear a rota do turno.',
       );
-    }
-
-    if (permission != LocationPermission.always) {
-      permission = await Geolocator.requestPermission();
     }
 
     final hasBackgroundPermission = permission == LocationPermission.always;

@@ -5,5 +5,5 @@
     android:accessibilityFlags="flagDefault"
     android:canTakeScreenshot="true"
     android:canRetrieveWindowContent="false"
-    android:packageNames="com.app99.driver,com.nineninetaxis.driver,com.taxis99.driver,com.taxis99,br.com.devbase.movesj.prestador,br.com.melevasj.taxi.drivermachine,com.google.android.apps.photos"
-    android:notificationTimeout="350" />
+    android:packageNames="com.ubercab.driver,com.app99.driver,com.nineninetaxis.driver,com.taxis99.driver,com.taxis99,br.com.devbase.movesj.prestador,br.com.melevasj.taxi.drivermachine,com.google.android.apps.photos"
+    android:notificationTimeout="100" />

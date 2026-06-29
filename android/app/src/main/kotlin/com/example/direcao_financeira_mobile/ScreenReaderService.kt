@@ -18,6 +18,7 @@ import android.view.accessibility.AccessibilityEvent
 import com.example.direcao_financeira_mobile.parsers.MeLevaSjParser
 import com.example.direcao_financeira_mobile.parsers.MoveSjParser
 import com.example.direcao_financeira_mobile.parsers.NinetyNineOcrParser
+import com.example.direcao_financeira_mobile.parsers.UberOcrParser
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -27,6 +28,8 @@ import java.net.URL
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class ScreenReaderService : AccessibilityService() {
     private val logTag = "DF-MoveSjDebug"
@@ -38,25 +41,36 @@ class ScreenReaderService : AccessibilityService() {
             "com.taxis99.driver",
             "com.taxis99",
         )
+    private val uberDriverPackages =
+        setOf(
+            "com.ubercab.driver",
+        )
     private val moveSjDriverPackage = "br.com.devbase.movesj.prestador"
     private val meLevaSjDriverPackage = "br.com.melevasj.taxi.drivermachine"
     private val googlePhotosPackage = "com.google.android.apps.photos"
     private val minimumProcessingIntervalMs = 350L
-    private val minimumOcrIntervalMs = 3000L
-    private val minimumMoveSjOcrIntervalMs = 2000L
-    private val ninetyNineReadDelayMs = 300L
-    private val moveSjReadDelayMs = 450L
-    private val moveSjRetryDelayMs = 650L
+    private val minimumOcrIntervalMs = 0L
+    private val minimumMoveSjOcrIntervalMs = 0L
+    private val ninetyNineReadDelayMs = 0L
+    private val ninetyNineRetryDelayMs = 220L
+    private val maxNinetyNineOcrAttempts = 3
+    private val uberReadDelayMs = 0L
+    private val uberRetryDelayMs = 220L
+    private val maxUberOcrAttempts = 3
+    private val moveSjReadDelayMs = 0L
+    private val moveSjRetryDelayMs = 350L
     private val maxMoveSjOcrAttempts = 2
     private val ocrWatchdogTimeoutMs = 8000L
-    private val overlayDisplayDelayMs = 200L
-    private val repeatedOfferQuietWindowMs = 2500L
+    private val overlayDisplayDelayMs = 0L
     private val duplicateOfferWindowMs = 20000L
 
     private val moveSjParser = MoveSjParser()
     private val meLevaSjParser = MeLevaSjParser()
     private val ninetyNineOcrParser = NinetyNineOcrParser()
+    private val uberOcrParser = UberOcrParser()
+    private val rideOfferDuplicateGuard = RideOfferDuplicateGuard(duplicateOfferWindowMs)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val ocrExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var floatingOverlay: FloatingOverlay? = null
     private var rideOfferNotificationDispatcher: RideOfferNotificationDispatcher? = null
     private var lastOfferData: Map<String, Any>? = null
@@ -71,7 +85,9 @@ class ScreenReaderService : AccessibilityService() {
     private var activeOcrToken = 0
     private var ocrWatchdogRunnable: Runnable? = null
     private var pendingNinetyNineRunnable: Runnable? = null
+    private var pendingUberRunnable: Runnable? = null
     private var pendingMoveSjRunnable: Runnable? = null
+    private var pendingMoveSjOcrRequest: PendingMoveSjOcrRequest? = null
     private var pendingOverlayRunnable: Runnable? = null
 
     companion object {
@@ -163,10 +179,12 @@ class ScreenReaderService : AccessibilityService() {
             pendingOverlayRunnable?.let(mainHandler::removeCallbacks)
             pendingMoveSjRunnable?.let(mainHandler::removeCallbacks)
             pendingNinetyNineRunnable?.let(mainHandler::removeCallbacks)
+            pendingUberRunnable?.let(mainHandler::removeCallbacks)
             ocrWatchdogRunnable?.let(mainHandler::removeCallbacks)
             pendingOverlayRunnable = null
             pendingMoveSjRunnable = null
             pendingNinetyNineRunnable = null
+            pendingUberRunnable = null
             ocrWatchdogRunnable = null
             ocrInFlight = false
             floatingOverlay?.hide()
@@ -201,14 +219,13 @@ class ScreenReaderService : AccessibilityService() {
             return
         }
 
-        if (shouldThrottle(packageName) || shouldRespectQuietWindow(packageName)) {
+        if (shouldThrottle(packageName)) {
             logLockscreenEvent(
-                "throttled_or_quiet_window",
+                "throttled",
                 event = event,
                 extra =
                     mapOf(
                         "shouldThrottle" to shouldThrottle(packageName),
-                        "shouldRespectQuietWindow" to shouldRespectQuietWindow(packageName),
                     ),
             )
             return
@@ -217,6 +234,12 @@ class ScreenReaderService : AccessibilityService() {
         if (isNinetyNineContext(packageName)) {
             logLockscreenEvent("schedule_99_processing", event = event)
             scheduleNinetyNineProcessing(packageName, event.displayId)
+            return
+        }
+
+        if (isUberContext(packageName)) {
+            logLockscreenEvent("schedule_uber_processing", event = event)
+            scheduleUberProcessing(packageName, event.displayId)
             return
         }
 
@@ -266,9 +289,12 @@ class ScreenReaderService : AccessibilityService() {
     private fun scheduleNinetyNineProcessing(
         packageName: String,
         displayId: Int,
+        attempt: Int = 1,
     ) {
         pendingNinetyNineRunnable?.let(mainHandler::removeCallbacks)
 
+        val safeAttempt = attempt.coerceIn(1, maxNinetyNineOcrAttempts)
+        val delayMs = if (safeAttempt == 1) ninetyNineReadDelayMs else ninetyNineRetryDelayMs
         val runnable =
             Runnable {
                 pendingNinetyNineRunnable = null
@@ -278,13 +304,42 @@ class ScreenReaderService : AccessibilityService() {
                         mapOf(
                             "eventPackage" to packageName,
                             "displayId" to displayId,
+                            "attempt" to safeAttempt,
                         ),
                 )
-                requestNinetyNineOcr(displayId)
+                requestNinetyNineOcr(displayId, safeAttempt)
             }
 
         pendingNinetyNineRunnable = runnable
-        mainHandler.postDelayed(runnable, ninetyNineReadDelayMs)
+        mainHandler.postDelayed(runnable, delayMs)
+    }
+
+    private fun scheduleUberProcessing(
+        packageName: String,
+        displayId: Int,
+        attempt: Int = 1,
+    ) {
+        pendingUberRunnable?.let(mainHandler::removeCallbacks)
+
+        val safeAttempt = attempt.coerceIn(1, maxUberOcrAttempts)
+        val delayMs = if (safeAttempt == 1) uberReadDelayMs else uberRetryDelayMs
+        val runnable =
+            Runnable {
+                pendingUberRunnable = null
+                logLockscreenMessage(
+                    "uber_ocr_delayed_processing",
+                    extra =
+                        mapOf(
+                            "eventPackage" to packageName,
+                            "displayId" to displayId,
+                            "attempt" to safeAttempt,
+                        ),
+                )
+                requestUberOcr(displayId, safeAttempt)
+            }
+
+        pendingUberRunnable = runnable
+        mainHandler.postDelayed(runnable, delayMs)
     }
 
     private fun processOffer(offerData: Map<String, Any>) {
@@ -307,17 +362,38 @@ class ScreenReaderService : AccessibilityService() {
             logLockscreenMessage("process_offer_invalid_passenger", extra = offerLogSummary(offerData))
             return
         }
+        if (appKey == "MoveSj" && !rideOfferDuplicateGuard.hasReliableMoveSjOfferData(offerData)) {
+            logLockscreenMessage("process_offer_unreliable_movesj_data", extra = offerLogSummary(offerData))
+            return
+        }
 
         val moveSjCoreSignature = buildMoveSjCoreSignature(offerData)
         val passengerRouteSignature = buildPassengerRouteSignature(offerData)
+        val isWithinDuplicateWindow =
+            lastAcceptedOfferAtElapsed > 0L &&
+                SystemClock.elapsedRealtime() - lastAcceptedOfferAtElapsed < duplicateOfferWindowMs
+        val recentDuplicateReason =
+            rideOfferDuplicateGuard.recentDuplicateReason(
+                offerData = offerData,
+                nowElapsed = SystemClock.elapsedRealtime(),
+            )
         debugLog("MoveSj processOffer signature=$signature summary=${offerLogSummary(offerData)}")
         if (
-            isDuplicateOffer(signature) ||
-                isDuplicatePassengerRouteOffer(passengerRouteSignature) ||
-                (appKey == "MoveSj" && isDuplicateMoveSjCoreOffer(moveSjCoreSignature))
+            recentDuplicateReason != null ||
+            (
+                isWithinDuplicateWindow &&
+                (
+                    isDuplicateOffer(signature) ||
+                        isDuplicatePassengerRouteOffer(passengerRouteSignature) ||
+                        (appKey == "MoveSj" && isDuplicateMoveSjCoreOffer(moveSjCoreSignature))
+                )
+            )
         ) {
             debugLog("MoveSj oferta ignorada por assinatura duplicada.")
-            logLockscreenMessage("process_offer_duplicate_signature", extra = offerLogSummary(offerData))
+            logLockscreenMessage(
+                "process_offer_duplicate_signature",
+                extra = offerLogSummary(offerData) + mapOf("reason" to (recentDuplicateReason ?: "exact_signature")),
+            )
             return
         }
 
@@ -331,6 +407,10 @@ class ScreenReaderService : AccessibilityService() {
         }
         lastAcceptedPassengerRouteSignature = passengerRouteSignature
         lastAcceptedOfferAtElapsed = SystemClock.elapsedRealtime()
+        rideOfferDuplicateGuard.rememberAcceptedOffer(
+            offerData = detectedOfferData,
+            acceptedAtElapsed = lastAcceptedOfferAtElapsed,
+        )
         hideAppBubbleForRideOffer()
 
         pendingOverlayRunnable?.let(mainHandler::removeCallbacks)
@@ -360,14 +440,26 @@ class ScreenReaderService : AccessibilityService() {
             "valor" to offerData["valor_bruto"],
             "km" to offerData["km_total"],
             "min" to offerData["minutos_total"],
+            "passageiro" to compactLogText(offerData["passenger_name"]?.toString()),
+            "origem" to compactLogText(offerData["origin_address"]?.toString(), maxLength = 90),
+            "destino" to compactLogText(offerData["destination_address"]?.toString(), maxLength = 90),
         )
     }
 
     private fun isSupportedRidePackage(packageName: String): Boolean {
         return isNinetyNineContext(packageName) ||
+            isUberContext(packageName) ||
             packageName == moveSjDriverPackage ||
             packageName == meLevaSjDriverPackage ||
             packageName == googlePhotosPackage
+    }
+
+    private fun isUberPackage(packageName: String): Boolean {
+        return uberDriverPackages.contains(packageName)
+    }
+
+    private fun isUberContext(packageName: String): Boolean {
+        return isUberPackage(packageName)
     }
 
     private fun isNinetyNinePackage(packageName: String): Boolean {
@@ -384,6 +476,7 @@ class ScreenReaderService : AccessibilityService() {
             packageName == meLevaSjDriverPackage -> SettingsManager.isMonitoredAppEnabled("MeLevaSJ")
             packageName == googlePhotosPackage -> SettingsManager.isMonitoredAppEnabled("GooglePhotos")
             isNinetyNineContext(packageName) -> SettingsManager.isMonitoredAppEnabled("99")
+            isUberContext(packageName) -> SettingsManager.isMonitoredAppEnabled("Uber")
             else -> false
         }
     }
@@ -400,24 +493,6 @@ class ScreenReaderService : AccessibilityService() {
         }
 
         return shouldSkip
-    }
-
-    private fun shouldRespectQuietWindow(packageName: String): Boolean {
-        if (lastAcceptedOfferAtElapsed == 0L) {
-            return false
-        }
-
-        val currentApp = resolveAppKey(packageName) ?: return false
-        val lastApp =
-            lastOfferData?.get("platform_name")?.toString()?.takeIf { it.isNotBlank() }
-                ?: lastOfferData?.get("app")?.toString()?.takeIf { it.isNotBlank() }
-                ?: return false
-        if (currentApp != lastApp) {
-            return false
-        }
-
-        return SystemClock.elapsedRealtime() - lastAcceptedOfferAtElapsed <
-            repeatedOfferQuietWindowMs
     }
 
     private fun isMeaningfulOffer(offerData: Map<String, Any>): Boolean {
@@ -481,6 +556,7 @@ class ScreenReaderService : AccessibilityService() {
             packageName == meLevaSjDriverPackage -> "MeLevaSJ"
             packageName == googlePhotosPackage -> "GooglePhotos"
             isNinetyNineContext(packageName) -> "99"
+            isUberContext(packageName) -> "Uber"
             else -> null
         }
     }
@@ -495,6 +571,7 @@ class ScreenReaderService : AccessibilityService() {
             appValue.equals("MoveSj", ignoreCase = true) -> "MoveSj"
             appValue.equals("MeLevaSJ", ignoreCase = true) -> "MeLevaSJ"
             appValue.equals("GooglePhotos", ignoreCase = true) -> "GooglePhotos"
+            appValue.equals("Uber", ignoreCase = true) -> "Uber"
             appValue.contains("99", ignoreCase = true) -> "99"
             else -> appValue
         }
@@ -506,7 +583,6 @@ class ScreenReaderService : AccessibilityService() {
             normalizeFingerprintValue(offerData["valor_bruto"]?.toString()),
             normalizeFingerprintValue(offerData["km_total"]?.toString()),
             normalizeFingerprintValue(offerData["minutos_total"]?.toString()),
-            normalizeFingerprintValue(offerData["passenger_name"]?.toString()),
             normalizeFingerprintValue(offerData["origin_address"]?.toString()),
             normalizeFingerprintValue(offerData["destination_address"]?.toString()),
         ).joinToString("|")
@@ -578,6 +654,18 @@ class ScreenReaderService : AccessibilityService() {
         return normalized.lowercase()
     }
 
+    private fun compactLogText(
+        value: String?,
+        maxLength: Int = 60,
+    ): String {
+        val compacted = value.orEmpty().replace(Regex("\\s+"), " ").trim()
+        if (compacted.length <= maxLength) {
+            return compacted
+        }
+
+        return compacted.take(maxLength - 3) + "..."
+    }
+
     private fun isExpiredRideRequestOcrText(
         rawText: String,
         lines: List<String>,
@@ -601,13 +689,7 @@ class ScreenReaderService : AccessibilityService() {
         }
 
         if (ocrInFlight) {
-            logLockscreenMessage(
-                "ocr_skip_in_flight",
-                extra = mapOf("attempt" to attempt),
-            )
-            if (attempt < maxMoveSjOcrAttempts) {
-                scheduleMoveSjOcrProcessing(displayId, attempt)
-            }
+            queuePendingMoveSjOcr(displayId, attempt, sourceAppKey)
             return
         }
 
@@ -640,7 +722,7 @@ class ScreenReaderService : AccessibilityService() {
         try {
             takeScreenshot(
                 screenshotDisplayId,
-                mainExecutor,
+                ocrExecutor,
                 object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
                         logLockscreenMessage(
@@ -714,6 +796,7 @@ class ScreenReaderService : AccessibilityService() {
 
     private fun requestNinetyNineOcr(
         displayId: Int,
+        attempt: Int = 1,
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             logLockscreenMessage("ocr_skip_sdk_too_old")
@@ -721,7 +804,13 @@ class ScreenReaderService : AccessibilityService() {
         }
 
         if (ocrInFlight) {
-            logLockscreenMessage("ocr_skip_in_flight", extra = mapOf("source" to "99"))
+            logLockscreenMessage(
+                "ocr_skip_in_flight",
+                extra = mapOf("source" to "99", "attempt" to attempt),
+            )
+            if (attempt < maxNinetyNineOcrAttempts) {
+                scheduleNinetyNineProcessing("99", displayId, attempt + 1)
+            }
             return
         }
 
@@ -745,6 +834,7 @@ class ScreenReaderService : AccessibilityService() {
                     mapOf(
                         "source" to "99",
                         "displayId" to displayId,
+                        "attempt" to attempt,
                     ),
             )
 
@@ -753,7 +843,7 @@ class ScreenReaderService : AccessibilityService() {
         try {
             takeScreenshot(
                 screenshotDisplayId,
-                mainExecutor,
+                ocrExecutor,
                 object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
                         logLockscreenMessage(
@@ -771,7 +861,7 @@ class ScreenReaderService : AccessibilityService() {
                         }
 
                         runCatching {
-                            runNinetyNineOcr(bitmap, ocrToken)
+                            runNinetyNineOcr(bitmap, ocrToken, displayId, attempt)
                         }.onFailure { error ->
                             runCatching { bitmap.recycle() }
                             logLockscreenMessage(
@@ -815,6 +905,117 @@ class ScreenReaderService : AccessibilityService() {
         }
     }
 
+    private fun requestUberOcr(
+        displayId: Int,
+        attempt: Int = 1,
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            logLockscreenMessage("ocr_skip_sdk_too_old")
+            return
+        }
+
+        if (ocrInFlight) {
+            logLockscreenMessage(
+                "ocr_skip_in_flight",
+                extra = mapOf("source" to "Uber", "attempt" to attempt),
+            )
+            if (attempt < maxUberOcrAttempts) {
+                scheduleUberProcessing("Uber", displayId, attempt + 1)
+            }
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastOcrAtElapsed < minimumOcrIntervalMs) {
+            logLockscreenMessage(
+                "ocr_skip_cooldown",
+                extra =
+                    mapOf(
+                        "source" to "Uber",
+                        "elapsedSinceLastOcrMs" to (now - lastOcrAtElapsed),
+                    ),
+            )
+            return
+        }
+
+        lastOcrAtElapsed = now
+        val ocrToken =
+            beginOcrRequest(
+                extra =
+                    mapOf(
+                        "source" to "Uber",
+                        "displayId" to displayId,
+                        "attempt" to attempt,
+                    ),
+            )
+
+        val screenshotDisplayId = if (displayId >= 0) displayId else Display.DEFAULT_DISPLAY
+
+        try {
+            takeScreenshot(
+                screenshotDisplayId,
+                ocrExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        logLockscreenMessage(
+                            "ocr_screenshot_success",
+                            extra = mapOf("ocrToken" to ocrToken, "source" to "Uber"),
+                        )
+                        val bitmap = screenshotToBitmap(screenshot)
+                        if (bitmap == null) {
+                            logLockscreenMessage(
+                                "ocr_bitmap_null",
+                                extra = mapOf("ocrToken" to ocrToken, "source" to "Uber"),
+                            )
+                            finishOcrRequest(ocrToken, "ocr_request_finished_bitmap_null")
+                            return
+                        }
+
+                        runCatching {
+                            runUberOcr(bitmap, ocrToken, displayId, attempt)
+                        }.onFailure { error ->
+                            runCatching { bitmap.recycle() }
+                            logLockscreenMessage(
+                                "ocr_start_failure",
+                                extra =
+                                    mapOf(
+                                        "ocrToken" to ocrToken,
+                                        "source" to "Uber",
+                                        "message" to (error.message ?: error::class.java.simpleName),
+                                    ),
+                            )
+                            finishOcrRequest(ocrToken, "ocr_request_finished_start_failure")
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        logLockscreenMessage(
+                            "ocr_screenshot_failure",
+                            extra =
+                                mapOf(
+                                    "ocrToken" to ocrToken,
+                                    "source" to "Uber",
+                                    "errorCode" to errorCode,
+                                ),
+                        )
+                        finishOcrRequest(ocrToken, "ocr_request_finished_screenshot_failure")
+                    }
+                },
+            )
+        } catch (error: Throwable) {
+            logLockscreenMessage(
+                "ocr_screenshot_request_throw",
+                extra =
+                    mapOf(
+                        "ocrToken" to ocrToken,
+                        "source" to "Uber",
+                        "message" to (error.message ?: error::class.java.simpleName),
+                    ),
+            )
+            finishOcrRequest(ocrToken, "ocr_request_finished_request_throw")
+        }
+    }
+
     private fun beginOcrRequest(extra: Map<String, Any?>): Int {
         activeOcrToken += 1
         val ocrToken = activeOcrToken
@@ -830,6 +1031,7 @@ class ScreenReaderService : AccessibilityService() {
                     )
                     ocrInFlight = false
                     ocrWatchdogRunnable = null
+                    dispatchPendingMoveSjOcrIfNeeded("ocr_watchdog_timeout")
                 }
             }.also { runnable ->
                 mainHandler.postDelayed(runnable, ocrWatchdogTimeoutMs)
@@ -846,6 +1048,7 @@ class ScreenReaderService : AccessibilityService() {
         ocrToken: Int,
         stage: String,
         extra: Map<String, Any?> = emptyMap(),
+        dispatchPendingMoveSj: Boolean = false,
     ) {
         if (ocrToken != activeOcrToken) {
             logLockscreenMessage(
@@ -859,6 +1062,63 @@ class ScreenReaderService : AccessibilityService() {
         ocrWatchdogRunnable = null
         ocrInFlight = false
         logLockscreenMessage(stage, extra = extra + mapOf("ocrToken" to ocrToken))
+        if (dispatchPendingMoveSj) {
+            mainHandler.post {
+                if (!ocrInFlight) {
+                    dispatchPendingMoveSjOcrIfNeeded(stage)
+                }
+            }
+        }
+    }
+
+    private fun queuePendingMoveSjOcr(
+        displayId: Int,
+        attempt: Int,
+        sourceAppKey: String,
+    ) {
+        val previous = pendingMoveSjOcrRequest
+        val safeAttempt = attempt.coerceIn(1, maxMoveSjOcrAttempts)
+        pendingMoveSjOcrRequest =
+            PendingMoveSjOcrRequest(
+                displayId = displayId,
+                attempt = safeAttempt,
+                sourceAppKey = sourceAppKey,
+            )
+        pendingMoveSjRunnable?.let(mainHandler::removeCallbacks)
+        pendingMoveSjRunnable = null
+
+        logLockscreenMessage(
+            "movesj_ocr_coalesced_in_flight",
+            extra =
+                mapOf(
+                    "displayId" to displayId,
+                    "attempt" to safeAttempt,
+                    "sourceAppKey" to sourceAppKey,
+                    "replacedPending" to (previous != null),
+                    "activeOcrToken" to activeOcrToken,
+                ),
+        )
+    }
+
+    private fun dispatchPendingMoveSjOcrIfNeeded(trigger: String) {
+        val pending = pendingMoveSjOcrRequest ?: return
+        pendingMoveSjOcrRequest = null
+
+        logLockscreenMessage(
+            "movesj_ocr_pending_dispatch",
+            extra =
+                mapOf(
+                    "trigger" to trigger,
+                    "displayId" to pending.displayId,
+                    "attempt" to pending.attempt,
+                    "sourceAppKey" to pending.sourceAppKey,
+                ),
+        )
+        scheduleMoveSjOcrProcessing(
+            displayId = pending.displayId,
+            attempt = pending.attempt,
+            sourceAppKey = pending.sourceAppKey,
+        )
     }
 
     private fun scheduleMoveSjRetry(
@@ -905,10 +1165,121 @@ class ScreenReaderService : AccessibilityService() {
             return false
         }
 
-        val normalized = lines.joinToString(" ").lowercase()
-        return normalized.contains("r$") ||
+        val normalized = lines.joinToString(" ") { normalizedText(it) }
+        val hasPrice = normalized.contains("r$") || normalized.contains("rs ")
+        val hasAction = normalized.contains("aceitar") || normalized.contains("recusar")
+        val hasMoveSjMarker = normalized.contains("move") || normalized.contains("movesj")
+        val hasMetric = normalized.contains("km") || normalized.contains("min")
+
+        return hasPrice || hasAction || (hasMoveSjMarker && hasMetric)
+    }
+
+    private fun logMoveSjOcrSnapshot(
+        ocrToken: Int,
+        sourceAppKey: String,
+        attempt: Int,
+        ocrLines: List<MoveSjParser.OcrLine>,
+    ) {
+        val lines = ocrLines.map { it.text }
+        logLockscreenMessage(
+            "movesj_ocr_snapshot",
+            extra =
+                mapOf(
+                    "ocrToken" to ocrToken,
+                    "source" to sourceAppKey,
+                    "attempt" to attempt,
+                    "lineCount" to lines.size,
+                    "signals" to moveSjOcrSignals(lines),
+                    "relevantLines" to formatRelevantMoveSjOcrLines(ocrLines),
+                ),
+        )
+    }
+
+    private fun moveSjOcrSignals(lines: List<String>): String {
+        val normalized = lines.joinToString(" ") { normalizedText(it) }
+        return listOf(
+            "price=${normalized.contains("r$") || normalized.contains("rs ")}",
+            "km=${normalized.contains("km")}",
+            "min=${normalized.contains("min")}",
+            "accept=${normalized.contains("aceitar")}",
+            "refuse=${normalized.contains("recusar")}",
+            "move=${normalized.contains("move")}",
+        ).joinToString(",")
+    }
+
+    private fun formatRelevantMoveSjOcrLines(ocrLines: List<MoveSjParser.OcrLine>): String {
+        val relevantLines =
+            ocrLines
+                .filter { line -> isRelevantMoveSjDiagnosticLine(line.text) }
+                .sortedWith(compareBy<MoveSjParser.OcrLine> { it.top }.thenBy { it.left })
+                .take(32)
+
+        val linesToLog =
+            if (relevantLines.isNotEmpty()) {
+                relevantLines
+            } else {
+                ocrLines
+                    .sortedWith(compareBy<MoveSjParser.OcrLine> { it.top }.thenBy { it.left })
+                    .take(20)
+            }
+
+        return linesToLog.joinToString(" | ") { line ->
+            "[${line.left},${line.top},${line.right},${line.bottom}] ${compactLogText(line.text, maxLength = 70)}"
+        }
+    }
+
+    private fun isRelevantMoveSjDiagnosticLine(text: String): Boolean {
+        val normalized = normalizedText(text)
+        return normalized.contains("move") ||
+            normalized.contains("r$") ||
+            normalized.contains("rs ") ||
+            normalized.contains("km") ||
+            normalized.contains("min") ||
             normalized.contains("aceitar") ||
             normalized.contains("recusar") ||
+            normalized.contains("motorista") ||
+            normalized.contains("brasil") ||
+            normalized.contains("cep") ||
+            normalized.contains("avenida") ||
+            normalized.contains("rua") ||
+            normalized.contains("av.") ||
+            normalized.contains("r.") ||
+            normalized.contains("independente") ||
+            normalized.contains("apac") ||
+            normalized.contains("bahamas")
+    }
+
+    private fun shouldRetryNinetyNineParse(
+        lines: List<String>,
+        attempt: Int,
+    ): Boolean {
+        if (attempt >= maxNinetyNineOcrAttempts) {
+            return false
+        }
+
+        val normalized = lines.joinToString(" ").lowercase()
+        return normalized.contains("r$") ||
+            normalized.contains("perfil") ||
+            normalized.contains("passageiro") ||
+            normalized.contains("dinheiro") ||
+            normalized.contains("pix") ||
+            normalized.contains("cart") ||
+            normalized.contains("km") ||
+            normalized.contains("min")
+    }
+
+    private fun shouldRetryUberParse(
+        lines: List<String>,
+        attempt: Int,
+    ): Boolean {
+        if (attempt >= maxUberOcrAttempts) {
+            return false
+        }
+
+        val normalized = lines.joinToString(" ").lowercase()
+        return normalized.contains("uber") ||
+            normalized.contains("r$") ||
+            normalized.contains("aceitar") ||
             normalized.contains("km") ||
             normalized.contains("min")
     }
@@ -925,7 +1296,7 @@ class ScreenReaderService : AccessibilityService() {
 
         recognizer
             .process(image)
-            .addOnSuccessListener { visionText ->
+            .addOnSuccessListener(ocrExecutor) { visionText ->
                 runCatching {
                     val ocrLines =
                         visionText.textBlocks
@@ -952,9 +1323,15 @@ class ScreenReaderService : AccessibilityService() {
                                 }
                             }
                     val lines = ocrLines.map { it.text }
+                    logMoveSjOcrSnapshot(
+                        ocrToken = ocrToken,
+                        sourceAppKey = sourceAppKey,
+                        attempt = attempt,
+                        ocrLines = ocrLines,
+                    )
 
                     if (isExpiredRideRequestOcrText(visionText.text, lines)) {
-                        stopRideOfferPresentation()
+                        runOnMain { stopRideOfferPresentation() }
                         logLockscreenMessage(
                             "ocr_expired_ride_request_dialog",
                             extra = mapOf("ocrToken" to ocrToken, "source" to "MoveSj"),
@@ -981,18 +1358,54 @@ class ScreenReaderService : AccessibilityService() {
                             ),
                     )
                     if (offerData != null) {
-                        logLockscreenMessage("ocr_offer_parsed", extra = offerLogSummary(offerData))
-                        enrichRouteIfNeededAndProcess(offerData, displayId, attempt, ocrToken)
-                    } else if (shouldRetryMoveSjParse(lines, attempt)) {
-                        scheduleMoveSjRetry(
-                            displayId = displayId,
-                            attempt = attempt,
-                            reason = "parse_incomplete",
-                            sourceAppKey = sourceAppKey,
-                            extra = mapOf("lineCount" to lines.size),
+                        logLockscreenMessage(
+                            "ocr_offer_parsed",
+                            extra =
+                                offerLogSummary(offerData) +
+                                    mapOf(
+                                        "ocrToken" to ocrToken,
+                                        "attempt" to attempt,
+                                    ),
                         )
+                        runOnMain {
+                            enrichRouteIfNeededAndProcess(offerData, displayId, attempt, ocrToken)
+                        }
+                    } else if (shouldRetryMoveSjParse(lines, attempt)) {
+                        logLockscreenMessage(
+                            "movesj_parse_null_retry",
+                            extra =
+                                mapOf(
+                                    "ocrToken" to ocrToken,
+                                    "source" to sourceAppKey,
+                                    "attempt" to attempt,
+                                    "lineCount" to lines.size,
+                                    "signals" to moveSjOcrSignals(lines),
+                                    "relevantLines" to formatRelevantMoveSjOcrLines(ocrLines),
+                                ),
+                        )
+                        runOnMain {
+                            scheduleMoveSjRetry(
+                                displayId = displayId,
+                                attempt = attempt,
+                                reason = "parse_incomplete",
+                                sourceAppKey = sourceAppKey,
+                                extra = mapOf("lineCount" to lines.size),
+                            )
+                        }
                     } else {
-                        restoreAppBubbleAfterRideOffer()
+                        logLockscreenMessage(
+                            "movesj_parse_null_no_retry",
+                            extra =
+                                mapOf(
+                                    "ocrToken" to ocrToken,
+                                    "source" to sourceAppKey,
+                                    "attempt" to attempt,
+                                    "lineCount" to lines.size,
+                                    "signals" to moveSjOcrSignals(lines),
+                                    "relevantLines" to formatRelevantMoveSjOcrLines(ocrLines),
+                                ),
+                        )
+                        runOnMain { restoreAppBubbleAfterRideOffer() }
                     }
                 }.onFailure { error ->
                     logLockscreenMessage(
@@ -1005,10 +1418,12 @@ class ScreenReaderService : AccessibilityService() {
                                 "message" to (error.message ?: error::class.java.simpleName),
                             ),
                     )
-                    scheduleMoveSjRetry(displayId, attempt, "parse_failure", sourceAppKey)
+                    runOnMain {
+                        scheduleMoveSjRetry(displayId, attempt, "parse_failure", sourceAppKey)
+                    }
                 }
             }
-            .addOnFailureListener { error ->
+            .addOnFailureListener(ocrExecutor) { error ->
                 logLockscreenMessage(
                     "ocr_failure",
                     extra =
@@ -1019,15 +1434,16 @@ class ScreenReaderService : AccessibilityService() {
                             "message" to (error.message ?: ""),
                         ),
                 )
-                scheduleMoveSjRetry(displayId, attempt, "ocr_failure", sourceAppKey)
+                runOnMain { scheduleMoveSjRetry(displayId, attempt, "ocr_failure", sourceAppKey) }
             }
-            .addOnCompleteListener {
+            .addOnCompleteListener(ocrExecutor) {
                 runCatching { bitmap.recycle() }
                 runCatching { recognizer.close() }
                 finishOcrRequest(
                     ocrToken,
                     "ocr_request_complete",
                     mapOf("source" to sourceAppKey, "attempt" to attempt),
+                    dispatchPendingMoveSj = true,
                 )
             }
     }
@@ -1250,8 +1666,10 @@ class ScreenReaderService : AccessibilityService() {
     private fun runNinetyNineOcr(
         bitmap: Bitmap,
         ocrToken: Int,
+        displayId: Int,
+        attempt: Int,
     ) {
-        val croppedBitmap = cropOfferRegion(bitmap)
+        val croppedBitmap = cropOfferRegion(bitmap, topFraction = 0.22f)
         bitmap.recycle()
 
         val image = InputImage.fromBitmap(croppedBitmap, 0)
@@ -1259,9 +1677,9 @@ class ScreenReaderService : AccessibilityService() {
 
         recognizer
             .process(image)
-            .addOnSuccessListener { visionText ->
+            .addOnSuccessListener(ocrExecutor) { visionText ->
                 runCatching {
-                    val lines =
+                    val ocrLines =
                         visionText.textBlocks
                             .flatMap { block -> block.lines }
                             .sortedWith(
@@ -1270,11 +1688,22 @@ class ScreenReaderService : AccessibilityService() {
                                     { line -> line.boundingBox?.left ?: Int.MAX_VALUE },
                                 ),
                             )
-                            .map { line -> line.text.trim() }
-                            .filter { it.isNotEmpty() }
+                            .mapNotNull { line ->
+                                val bounds = line.boundingBox ?: return@mapNotNull null
+                                val text = line.text.trim()
+                                if (text.isEmpty()) return@mapNotNull null
+                                NinetyNineOcrParser.OcrLine(
+                                    text = text,
+                                    left = bounds.left,
+                                    top = bounds.top,
+                                    right = bounds.right,
+                                    bottom = bounds.bottom,
+                                )
+                            }
+                    val lines = ocrLines.map { it.text }
 
                     if (isExpiredRideRequestOcrText(visionText.text, lines)) {
-                        stopRideOfferPresentation()
+                        runOnMain { stopRideOfferPresentation() }
                         logLockscreenMessage(
                             "ocr_expired_ride_request_dialog",
                             extra = mapOf("ocrToken" to ocrToken, "source" to "99"),
@@ -1282,22 +1711,27 @@ class ScreenReaderService : AccessibilityService() {
                         return@runCatching
                     }
 
-                    val offerData = ninetyNineOcrParser.parseOffer(visionText.text, lines)
+                    val offerData = ninetyNineOcrParser.parsePositionedOffer(visionText.text, ocrLines)
                     logLockscreenMessage(
                         "ocr_result",
                         extra =
                             mapOf(
                                 "ocrToken" to ocrToken,
                                 "source" to "99",
+                                "attempt" to attempt,
                                 "lineCount" to lines.size,
                                 "parsedOffer" to (offerData != null),
                             ),
                     )
                     if (offerData != null) {
                         logLockscreenMessage("ocr_offer_parsed", extra = offerLogSummary(offerData))
-                        processOffer(offerData)
+                        runOnMain { processOffer(offerData) }
+                    } else if (shouldRetryNinetyNineParse(lines, attempt)) {
+                        runOnMain {
+                            scheduleNinetyNineProcessing("99", displayId, attempt + 1)
+                        }
                     } else {
-                        restoreAppBubbleAfterRideOffer()
+                        runOnMain { restoreAppBubbleAfterRideOffer() }
                     }
                 }.onFailure { error ->
                     logLockscreenMessage(
@@ -1306,35 +1740,168 @@ class ScreenReaderService : AccessibilityService() {
                             mapOf(
                                 "ocrToken" to ocrToken,
                                 "source" to "99",
+                                "attempt" to attempt,
                                 "message" to (error.message ?: error::class.java.simpleName),
                             ),
                     )
+                    if (attempt < maxNinetyNineOcrAttempts) {
+                        runOnMain {
+                            scheduleNinetyNineProcessing("99", displayId, attempt + 1)
+                        }
+                    }
                 }
             }
-            .addOnFailureListener { error ->
+            .addOnFailureListener(ocrExecutor) { error ->
                 logLockscreenMessage(
                     "ocr_failure",
                     extra =
                         mapOf(
                             "ocrToken" to ocrToken,
                             "source" to "99",
+                            "attempt" to attempt,
                             "message" to (error.message ?: ""),
                         ),
                 )
+                if (attempt < maxNinetyNineOcrAttempts) {
+                    runOnMain {
+                        scheduleNinetyNineProcessing("99", displayId, attempt + 1)
+                    }
+                }
             }
-            .addOnCompleteListener {
+            .addOnCompleteListener(ocrExecutor) {
                 runCatching { croppedBitmap.recycle() }
                 runCatching { recognizer.close() }
                 finishOcrRequest(
                     ocrToken,
                     "ocr_request_complete",
-                    mapOf("source" to "99"),
+                    mapOf("source" to "99", "attempt" to attempt),
+                    dispatchPendingMoveSj = true,
                 )
             }
     }
 
-    private fun cropOfferRegion(bitmap: Bitmap): Bitmap {
-        val top = (bitmap.height * 0.32f).toInt().coerceIn(0, bitmap.height - 1)
+    private fun runUberOcr(
+        bitmap: Bitmap,
+        ocrToken: Int,
+        displayId: Int,
+        attempt: Int,
+    ) {
+        val croppedBitmap = cropOfferRegion(bitmap, topFraction = 0.35f)
+        bitmap.recycle()
+
+        val image = InputImage.fromBitmap(croppedBitmap, 0)
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        recognizer
+            .process(image)
+            .addOnSuccessListener(ocrExecutor) { visionText ->
+                runCatching {
+                    val ocrLines =
+                        visionText.textBlocks
+                            .flatMap { block -> block.lines }
+                            .sortedWith(
+                                compareBy(
+                                    { line -> line.boundingBox?.top ?: Int.MAX_VALUE },
+                                    { line -> line.boundingBox?.left ?: Int.MAX_VALUE },
+                                ),
+                            )
+                            .mapNotNull { line ->
+                                val bounds = line.boundingBox ?: return@mapNotNull null
+                                val text = line.text.trim()
+                                if (text.isEmpty()) return@mapNotNull null
+                                UberOcrParser.OcrLine(
+                                    text = text,
+                                    left = bounds.left,
+                                    top = bounds.top,
+                                    right = bounds.right,
+                                    bottom = bounds.bottom,
+                                )
+                            }
+                    val lines = ocrLines.map { it.text }
+
+                    if (isExpiredRideRequestOcrText(visionText.text, lines)) {
+                        runOnMain { stopRideOfferPresentation() }
+                        logLockscreenMessage(
+                            "ocr_expired_ride_request_dialog",
+                            extra = mapOf("ocrToken" to ocrToken, "source" to "Uber"),
+                        )
+                        return@runCatching
+                    }
+
+                    val offerData = uberOcrParser.parsePositionedOffer(visionText.text, ocrLines)
+                    logLockscreenMessage(
+                        "ocr_result",
+                        extra =
+                            mapOf(
+                                "ocrToken" to ocrToken,
+                                "source" to "Uber",
+                                "attempt" to attempt,
+                                "lineCount" to lines.size,
+                                "parsedOffer" to (offerData != null),
+                            ),
+                    )
+                    if (offerData != null) {
+                        logLockscreenMessage("ocr_offer_parsed", extra = offerLogSummary(offerData))
+                        runOnMain { processOffer(offerData) }
+                    } else if (shouldRetryUberParse(lines, attempt)) {
+                        runOnMain {
+                            scheduleUberProcessing("Uber", displayId, attempt + 1)
+                        }
+                    } else {
+                        runOnMain { restoreAppBubbleAfterRideOffer() }
+                    }
+                }.onFailure { error ->
+                    logLockscreenMessage(
+                        "ocr_parse_failure",
+                        extra =
+                            mapOf(
+                                "ocrToken" to ocrToken,
+                                "source" to "Uber",
+                                "attempt" to attempt,
+                                "message" to (error.message ?: error::class.java.simpleName),
+                            ),
+                    )
+                    if (attempt < maxUberOcrAttempts) {
+                        runOnMain {
+                            scheduleUberProcessing("Uber", displayId, attempt + 1)
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener(ocrExecutor) { error ->
+                logLockscreenMessage(
+                    "ocr_failure",
+                    extra =
+                        mapOf(
+                            "ocrToken" to ocrToken,
+                            "source" to "Uber",
+                            "attempt" to attempt,
+                            "message" to (error.message ?: ""),
+                        ),
+                )
+                if (attempt < maxUberOcrAttempts) {
+                    runOnMain {
+                        scheduleUberProcessing("Uber", displayId, attempt + 1)
+                    }
+                }
+            }
+            .addOnCompleteListener(ocrExecutor) {
+                runCatching { croppedBitmap.recycle() }
+                runCatching { recognizer.close() }
+                finishOcrRequest(
+                    ocrToken,
+                    "ocr_request_complete",
+                    mapOf("source" to "Uber", "attempt" to attempt),
+                    dispatchPendingMoveSj = true,
+                )
+            }
+    }
+
+    private fun cropOfferRegion(
+        bitmap: Bitmap,
+        topFraction: Float,
+    ): Bitmap {
+        val top = (bitmap.height * topFraction).toInt().coerceIn(0, bitmap.height - 1)
         val height = (bitmap.height - top).coerceAtLeast(1)
         return Bitmap.createBitmap(bitmap, 0, top, bitmap.width, height)
     }
@@ -1409,19 +1976,34 @@ class ScreenReaderService : AccessibilityService() {
         }
     }
 
+    private fun runOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action()
+        } else {
+            mainHandler.post(action)
+        }
+    }
+
     override fun onInterrupt() {
         pendingOverlayRunnable?.let(mainHandler::removeCallbacks)
         pendingMoveSjRunnable?.let(mainHandler::removeCallbacks)
         pendingNinetyNineRunnable?.let(mainHandler::removeCallbacks)
+        pendingUberRunnable?.let(mainHandler::removeCallbacks)
         ocrWatchdogRunnable?.let(mainHandler::removeCallbacks)
         pendingOverlayRunnable = null
         pendingMoveSjRunnable = null
         pendingNinetyNineRunnable = null
+        pendingUberRunnable = null
         ocrWatchdogRunnable = null
         ocrInFlight = false
         floatingOverlay?.hide()
         restoreAppBubbleAfterRideOffer()
         logLockscreenMessage("service_interrupt")
+    }
+
+    override fun onDestroy() {
+        ocrExecutor.shutdownNow()
+        super.onDestroy()
     }
 
     private fun hideAppBubbleForRideOffer() {
@@ -1436,9 +2018,11 @@ class ScreenReaderService : AccessibilityService() {
         pendingOverlayRunnable?.let(mainHandler::removeCallbacks)
         pendingMoveSjRunnable?.let(mainHandler::removeCallbacks)
         pendingNinetyNineRunnable?.let(mainHandler::removeCallbacks)
+        pendingUberRunnable?.let(mainHandler::removeCallbacks)
         pendingOverlayRunnable = null
         pendingMoveSjRunnable = null
         pendingNinetyNineRunnable = null
+        pendingUberRunnable = null
         floatingOverlay?.hide()
         rideOfferNotificationDispatcher?.dismissLast()
         restoreAppBubbleAfterRideOffer()
@@ -1492,4 +2076,10 @@ class ScreenReaderService : AccessibilityService() {
             false
         }
     }
+
+    private data class PendingMoveSjOcrRequest(
+        val displayId: Int,
+        val attempt: Int,
+        val sourceAppKey: String,
+    )
 }

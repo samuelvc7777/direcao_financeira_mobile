@@ -1,35 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:direcao_financeira_mobile/app/core/theme/app_colors.dart';
 
 class LoginHeader extends StatelessWidget {
   const LoginHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
-        const Icon(
-          Icons.directions_car_filled_rounded,
-          size: 80,
-          color: AppColors.teal,
+        Image.asset(
+          'assets/images/logo_direcao_financeira2.png.png',
+          width: 161,
+          height: 152,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text(
           'Direção Financeira',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            letterSpacing: 1.2,
+            fontSize: 29,
+            fontWeight: FontWeight.w800,
+            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
           ),
         ),
+        const SizedBox(height: 8),
         Text(
-          'Gestão de Elite para Motoristas',
+          'Gestão de elite para motoristas',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
         ),
       ],
     );

@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -74,6 +73,9 @@ class RideOfferNotificationDispatcher(
         return runCatching {
             val notificationManager =
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            lastNotificationId
+                ?.takeIf { it != content.notificationId }
+                ?.let(notificationManager::cancel)
             notificationManager.notify(content.notificationId, builder.build())
             lastNotificationId = content.notificationId
             true
@@ -155,21 +157,7 @@ class RideOfferNotificationDispatcher(
     }
 
     private fun buildMapsIntent(address: String): Intent {
-        val encodedAddress = Uri.encode(address)
-        val uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$encodedAddress")
-        val mapsIntent =
-            Intent(Intent.ACTION_VIEW, uri).apply {
-                setPackage(googleMapsPackage)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-        if (mapsIntent.resolveActivity(context.packageManager) != null) {
-            return mapsIntent
-        }
-
-        return Intent(Intent.ACTION_VIEW, uri).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        return MapsIntentFactory.buildSearchIntent(context, address)
     }
 
     private fun pendingIntentImmutableFlag(): Int {
@@ -188,7 +176,6 @@ class RideOfferNotificationDispatcher(
 
     private companion object {
         const val notificationChannelId = "corridas_detectadas"
-        const val googleMapsPackage = "com.google.android.apps.maps"
         const val logTag = "DF-RideNotification"
     }
 }

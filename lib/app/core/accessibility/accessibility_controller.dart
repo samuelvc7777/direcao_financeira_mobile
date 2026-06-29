@@ -244,13 +244,7 @@ class AccessibilityController extends GetxController
   }
 
   Map<String, bool> _normalizeMonitoredApps(dynamic rawMonitoredApps) {
-    if (rawMonitoredApps is Map) {
-      return rawMonitoredApps.map(
-        (key, value) => MapEntry(key.toString(), value == true),
-      );
-    }
-
-    return {
+    final defaults = {
       'Uber': true,
       '99': true,
       'inDrive': true,
@@ -258,6 +252,17 @@ class AccessibilityController extends GetxController
       'MeLevaSJ': false,
       'GooglePhotos': false,
     };
+
+    if (rawMonitoredApps is Map) {
+      return {
+        ...defaults,
+        ...rawMonitoredApps.map(
+          (key, value) => MapEntry(key.toString(), value == true),
+        ),
+      };
+    }
+
+    return defaults;
   }
 
   Future<void> _handleRaceDetected(dynamic arguments) async {

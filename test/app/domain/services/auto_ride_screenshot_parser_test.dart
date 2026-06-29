@@ -56,6 +56,52 @@ Independentes
     expect(result.destinationAddress, contains('Independentes'));
   });
 
+  test('detecta 99 na leitura da galeria antes do fallback MoveSJ', () {
+    const parser = AutoRideScreenshotParser();
+
+    final result = parser.parse('''
+Negocia · Dinheiro
+R\$12,60
+R\$2,17/km
+Preço x1,7
+4,88 · 162 corridas
+Perfil Essencial
+7min (2,5km)
+Campos Distribuidora, Rua Sena Madureira - Pontilhao
+8min (3,3km)
+Rua Ulisses Magri, 37, Ipanema
+Aceitar por R\$12,60
+R\$13,23
+''');
+
+    expect(result.platformName, '99');
+    expect(result.grossValueCents, 1260);
+    expect(result.paymentMethod, 'Dinheiro');
+    expect(result.originAddress, contains('Campos Distribuidora'));
+    expect(result.destinationAddress, contains('Rua Ulisses Magri'));
+  });
+
+  test('detecta Uber na leitura da galeria antes dos demais parsers', () {
+    const parser = AutoRideScreenshotParser();
+
+    final result = parser.parse('''
+UberX
+R\$ 12,30
+4,93 (42)
+10 min (4.0 km)
+Rua Marco Aurélio Stefani, Barbacena, Barbacena
+11 minutos (4.4 km)
+condomínio adib kyrillos, 39, Pontilhão, Barbacena
+Aceitar
+''');
+
+    expect(result.platformName, 'Uber');
+    expect(result.grossValueCents, 1230);
+    expect(result.passengerRating, 4.93);
+    expect(result.originAddress, contains('Marco Aurélio'));
+    expect(result.destinationAddress, contains('kyrillos'));
+  });
+
   test('detecta Me Leva SJ e limpa embarque e destino do print', () {
     const parser = AutoRideScreenshotParser();
 

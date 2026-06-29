@@ -1,10 +1,24 @@
 import '../entities/ride_screenshot_import_entity.dart';
 import 'movesj_history_screenshot_parser.dart';
+import 'ninety_nine_screenshot_parser.dart';
+import 'uber_screenshot_parser.dart';
 
 class AutoRideScreenshotParser {
   const AutoRideScreenshotParser();
 
   RideScreenshotImportEntity parsePositioned(List<OcrTextLine> ocrLines) {
+    if (const UberScreenshotParser().looksLike(
+      ocrLines.map((line) => line.text).toList(),
+    )) {
+      return const UberScreenshotParser().parsePositioned(ocrLines);
+    }
+
+    if (const NinetyNineScreenshotParser().looksLike(
+      ocrLines.map((line) => line.text).toList(),
+    )) {
+      return const NinetyNineScreenshotParser().parsePositioned(ocrLines);
+    }
+
     if (_looksLikeMeLevaSj(ocrLines.map((line) => line.text).toList())) {
       return _parseMeLevaPositioned(ocrLines);
     }
@@ -14,6 +28,14 @@ class AutoRideScreenshotParser {
 
   RideScreenshotImportEntity parse(String rawText) {
     final lines = _splitLines(rawText);
+    if (const UberScreenshotParser().looksLike(lines)) {
+      return const UberScreenshotParser().parse(rawText);
+    }
+
+    if (const NinetyNineScreenshotParser().looksLike(lines)) {
+      return const NinetyNineScreenshotParser().parse(rawText);
+    }
+
     if (_looksLikeMeLevaSj(lines)) {
       return _parseMeLevaLines(lines);
     }

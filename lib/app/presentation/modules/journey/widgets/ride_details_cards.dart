@@ -151,7 +151,11 @@ class _AppChip extends StatelessWidget {
 
 /// Card hero com gradiente azul que exibe o valor bruto e passageiro.
 class RideValueHeroCard extends StatelessWidget {
-  const RideValueHeroCard({super.key, required this.ride, required this.isDark});
+  const RideValueHeroCard({
+    super.key,
+    required this.ride,
+    required this.isDark,
+  });
 
   final RideEntity ride;
   final bool isDark;
@@ -289,7 +293,9 @@ class RideMetricsGrid extends StatelessWidget {
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.55,
-      children: metrics.map((m) => _MetricTile(data: m, isDark: isDark)).toList(),
+      children: metrics
+          .map((m) => _MetricTile(data: m, isDark: isDark))
+          .toList(),
     );
   }
 }
@@ -352,10 +358,18 @@ class _MetricTile extends StatelessWidget {
 
 /// Card visual de rota: Origem → linha gradiente → Destino.
 class RideRouteCard extends StatelessWidget {
-  const RideRouteCard({super.key, required this.ride, required this.isDark});
+  const RideRouteCard({
+    super.key,
+    required this.ride,
+    required this.isDark,
+    this.onOpenOrigin,
+    this.onOpenDestination,
+  });
 
   final RideEntity ride;
   final bool isDark;
+  final VoidCallback? onOpenOrigin;
+  final VoidCallback? onOpenDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -370,17 +384,8 @@ class RideRouteCard extends StatelessWidget {
             label: 'Origem',
             value: ride.origin,
             isDark: isDark,
+            onOpen: onOpenOrigin,
           ),
-          if (ride.rideType?.trim().isNotEmpty == true) ...[
-            const SizedBox(height: 12),
-            _RouteStop(
-              icon: Icons.alt_route_rounded,
-              iconColor: AppColors.royalBlue,
-              label: 'Rota',
-              value: ride.rideType!.trim(),
-              isDark: isDark,
-            ),
-          ],
           Padding(
             padding: const EdgeInsets.only(left: 20),
             child: Row(
@@ -410,6 +415,7 @@ class RideRouteCard extends StatelessWidget {
             label: 'Destino',
             value: ride.destination,
             isDark: isDark,
+            onOpen: onOpenDestination,
           ),
         ],
       ),
@@ -425,6 +431,7 @@ class _RouteStop extends StatelessWidget {
     required this.label,
     required this.value,
     required this.isDark,
+    this.onOpen,
   });
 
   final IconData icon;
@@ -432,6 +439,7 @@ class _RouteStop extends StatelessWidget {
   final String label;
   final String value;
   final bool isDark;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -465,6 +473,24 @@ class _RouteStop extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          onPressed: onOpen,
+          tooltip: 'Abrir $label no Maps',
+          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+          style: IconButton.styleFrom(
+            backgroundColor: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.04),
+            foregroundColor: isDark ? Colors.white : Colors.black87,
+            disabledBackgroundColor: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.black.withValues(alpha: 0.03),
+            disabledForegroundColor: isDark ? Colors.white30 : Colors.black26,
+            minimumSize: const Size(38, 38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
       ],

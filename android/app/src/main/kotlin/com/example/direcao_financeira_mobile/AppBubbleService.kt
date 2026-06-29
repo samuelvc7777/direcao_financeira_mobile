@@ -26,7 +26,7 @@ import androidx.core.app.NotificationCompat
 import kotlin.math.abs
 
 class AppBubbleService : Service() {
-    private val bubbleAssetPath = "flutter_assets/assets/images/logo_direcao_financeira2.png"
+    private val bubbleAssetPath = "flutter_assets/assets/images/logo_direcao_financeira2.png.png"
     private val trafficLightActiveAccentColor = 0xFFE05A5A.toInt()
     private val trafficLightInactiveAccentColor = 0xFF3DDC84.toInt()
 

@@ -350,6 +350,9 @@ class ImportRidePhotoController extends GetxController {
 
   void _applyParsedRide(RideScreenshotImportEntity parsed) {
     parsedDateTime.value = parsed.detectedAt;
+    selectedPaymentOption.value = _paymentOptionFromParsed(
+      parsed.paymentMethod,
+    );
     passengerController.text = parsed.passengerName ?? '';
     passengerRatingController.text = parsed.passengerRating == null
         ? ''
@@ -359,6 +362,28 @@ class ImportRidePhotoController extends GetxController {
     amountController.text = parsed.grossValueCents == null
         ? ''
         : _formatCents(parsed.grossValueCents!);
+  }
+
+  RidePaymentOption? _paymentOptionFromParsed(String? paymentMethod) {
+    final normalized = paymentMethod?.toLowerCase().trim() ?? '';
+    if (normalized.isEmpty) {
+      return null;
+    }
+    if (normalized.contains('dinheiro')) {
+      return RidePaymentOption.cash;
+    }
+    if (normalized.contains('pix')) {
+      return RidePaymentOption.pix;
+    }
+    if (normalized.contains('cartao') ||
+        normalized.contains('cartão') ||
+        normalized.contains('card')) {
+      return RidePaymentOption.creditOrDebitCard;
+    }
+    if (normalized.contains('voucher')) {
+      return RidePaymentOption.voucher;
+    }
+    return null;
   }
 
   void _applyRide(RideEntity ride) {

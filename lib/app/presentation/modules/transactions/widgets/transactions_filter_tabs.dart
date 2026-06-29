@@ -2,71 +2,67 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/utils/responsive.dart';
-import '../../../widgets/scale_button.dart';
 import '../transactions_controller.dart';
 
 class TransactionsFilterTabs extends StatelessWidget {
   const TransactionsFilterTabs({
     super.key,
     required this.selectedFilter,
-    required this.onChanged,
+    required this.onFilterChanged,
   });
 
   final TransactionsFilter selectedFilter;
-  final ValueChanged<TransactionsFilter> onChanged;
+  final ValueChanged<TransactionsFilter> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.theme.colorScheme;
     final isDark = context.theme.brightness == Brightness.dark;
-    final containerPadding = Responsive.hp(context, 1.2).clamp(4.0, 6.0);
-    final spacing = Responsive.hp(context, 2.2).clamp(6.0, 8.0);
-    final borderRadius = Responsive.hp(context, 6.4).clamp(18.0, 20.0);
 
-    return Container(
-      padding: EdgeInsets.all(containerPadding),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.deepNavy : colorScheme.surface,
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(
+    return SizedBox(
+      height: 48,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : colorScheme.outlineVariant.withValues(alpha: 0.35),
+              ? Colors.black.withValues(alpha: 0.58)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : colorScheme.outlineVariant.withValues(alpha: 0.42),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _FilterTab(
-              label: TransactionsFilter.all.label,
-              icon: Icons.layers_rounded,
-              accentColor: AppColors.royalBlue,
-              isSelected: selectedFilter == TransactionsFilter.all,
-              onTap: () => onChanged(TransactionsFilter.all),
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Row(
+            children: [
+              _FilterTab(
+                label: TransactionsFilter.all.label,
+                icon: Icons.filter_list_rounded,
+                accentColor: AppColors.royalBlue,
+                isSelected: selectedFilter == TransactionsFilter.all,
+                onTap: () => onFilterChanged(TransactionsFilter.all),
+              ),
+              const SizedBox(width: 5),
+              _FilterTab(
+                label: TransactionsFilter.income.label,
+                icon: Icons.arrow_upward_rounded,
+                accentColor: AppColors.emerald,
+                isSelected: selectedFilter == TransactionsFilter.income,
+                onTap: () => onFilterChanged(TransactionsFilter.income),
+              ),
+              const SizedBox(width: 5),
+              _FilterTab(
+                label: TransactionsFilter.expense.label,
+                icon: Icons.arrow_downward_rounded,
+                accentColor: AppColors.rose,
+                isSelected: selectedFilter == TransactionsFilter.expense,
+                onTap: () => onFilterChanged(TransactionsFilter.expense),
+              ),
+            ],
           ),
-          SizedBox(width: spacing),
-          Expanded(
-            child: _FilterTab(
-              label: TransactionsFilter.income.label,
-              icon: Icons.arrow_upward_rounded,
-              accentColor: AppColors.emerald,
-              isSelected: selectedFilter == TransactionsFilter.income,
-              onTap: () => onChanged(TransactionsFilter.income),
-            ),
-          ),
-          SizedBox(width: spacing),
-          Expanded(
-            child: _FilterTab(
-              label: TransactionsFilter.expense.label,
-              icon: Icons.arrow_downward_rounded,
-              accentColor: AppColors.rose,
-              isSelected: selectedFilter == TransactionsFilter.expense,
-              onTap: () => onChanged(TransactionsFilter.expense),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -91,79 +87,55 @@ class _FilterTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = context.theme.colorScheme;
     final isDark = context.theme.brightness == Brightness.dark;
-    final horizontalPadding = Responsive.hp(context, 3.2).clamp(8.0, 10.0);
-    final verticalPadding = Responsive.vp(context, 1.2).clamp(8.0, 10.0);
-    final borderRadius = Responsive.hp(context, 5.4).clamp(16.0, 18.0);
-    final iconSize = Responsive.sp(context, 18).clamp(16.0, 18.0);
-    final labelSize = Responsive.sp(context, 14).clamp(13.0, 14.0);
-    final neutralText = isDark
+    final neutralColor = isDark
         ? Colors.white.withValues(alpha: 0.72)
         : colorScheme.onSurface.withValues(alpha: 0.62);
+    final foregroundColor = isSelected ? accentColor : neutralColor;
 
-    return ScaleButton(
-      enableHaptic: false,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: horizontalPadding,
-          vertical: verticalPadding,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? accentColor.withValues(alpha: isDark ? 0.18 : 0.12)
-              : (isDark
-                    ? AppColors.midnight
-                    : colorScheme.surfaceContainerLowest),
-          borderRadius: BorderRadius.circular(borderRadius),
-          border: Border.all(
-            color: isSelected
-                ? accentColor.withValues(alpha: isDark ? 0.42 : 0.30)
-                : colorScheme.outlineVariant.withValues(
-                    alpha: isDark ? 0.22 : 0.5,
-                  ),
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: isDark ? 0.12 : 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
+    return Expanded(
+      child: SizedBox.expand(
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(19),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 130),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? accentColor.withValues(alpha: isDark ? 0.18 : 0.12)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(
+                  color: isSelected
+                      ? accentColor.withValues(alpha: isDark ? 0.36 : 0.28)
+                      : Colors.transparent,
+                ),
+              ),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      icon,
-                      size: iconSize,
-                      color: isSelected ? accentColor : neutralText,
-                    ),
-                    const SizedBox(width: 8),
+                    Icon(icon, size: 15, color: foregroundColor),
+                    const SizedBox(width: 6),
                     Text(
                       label,
                       style: TextStyle(
-                        color: isSelected ? accentColor : neutralText,
-                        fontSize: labelSize,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                        color: foregroundColor,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

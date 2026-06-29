@@ -22,6 +22,7 @@ class RegisterController extends GetxController {
   final isLoading = false.obs;
   final isPasswordVisible = false.obs;
   final isConfirmPasswordVisible = false.obs;
+  final acceptedSensitiveDataConsent = false.obs;
 
   final hasMinLength = false.obs;
   final hasUppercase = false.obs;
@@ -50,7 +51,19 @@ class RegisterController extends GetxController {
   void togglePasswordVisibility() => isPasswordVisible.toggle();
   void toggleConfirmPasswordVisibility() => isConfirmPasswordVisible.toggle();
 
+  void setSensitiveDataConsentAccepted(bool value) {
+    acceptedSensitiveDataConsent.value = value;
+  }
+
   Future<void> register() async {
+    if (!acceptedSensitiveDataConsent.value) {
+      _showError(
+        'Consentimento obrigatorio',
+        'Leia e aceite o uso de dados e permissoes sensiveis para continuar.',
+      );
+      return;
+    }
+
     final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();

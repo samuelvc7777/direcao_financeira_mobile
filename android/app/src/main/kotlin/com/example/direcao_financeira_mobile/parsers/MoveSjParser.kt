@@ -5,26 +5,49 @@ import kotlin.math.abs
 
 class MoveSjParser {
 
-    private val priceRegex = Regex("R\\$\\s*\\d+(?:[.,]\\d+)?")
+    // Padroes principais que identificam as partes da tela da oferta.
+    // O parser depende desses textos porque a MoveSJ e lida por OCR, nao por API.
+    private val priceRegex = Regex("(?:R\\$|RS|R\\s*\\$)\\s*\\d+(?:[.,]\\d+)?", RegexOption.IGNORE_CASE)
     private val ratingRegex =
         Regex("\\d+(?:[.,]\\d+)?\\s*[\\u2605\\u2B50]", RegexOption.IGNORE_CASE)
     private val ratingValueRegex =
         Regex("^\\d(?:[.,]\\d{1,2})\\s*(?:[\\u2605\\u2B50])?$", RegexOption.IGNORE_CASE)
+    private val ratingNumberRegex =
+        Regex("\\d(?:[.,]\\d{1,2})", RegexOption.IGNORE_CASE)
+    // Trecho da rota exibido na lista de origem/destino: "1,5 km (4 min)" ou "300 m (2 min)".
     private val routeStepRegex =
         Regex(
             "\\d+(?:[.,]\\d+)?\\s*(?:km|m)\\s*\\((?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min\\)",
             RegexOption.IGNORE_CASE,
         )
-    private val offerDistanceRegex =
+    private val routeStepAnchorRegex =
         Regex(
-            "(\\d+(?:[.,]\\d+)?)\\s*km\\s*\\(\\s*R\\$\\s*\\d+(?:[.,]\\d+)?\\s*/\\s*km\\s*\\)",
+            "^\\s*\\d+(?:[.,]\\d+)?\\s*(?:km|m)(?:\\s*\\(?(?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min\\)?)?\\s*$",
             RegexOption.IGNORE_CASE,
         )
+    private val routeStepPrefixRegex =
+        Regex(
+            "^\\s*\\d+(?:[.,]\\d+)?\\s*(?:km|m)(?:\\s*\\((?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min\\)|\\s+(?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min)?",
+            RegexOption.IGNORE_CASE,
+        )
+    private val routeDurationOnlyRegex =
+        Regex(
+            "^\\s*\\(?(?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min\\)?\\s*$",
+            RegexOption.IGNORE_CASE,
+        )
+    // Metricas principais da oferta: distancia total e valor por km.
+    private val offerDistanceRegex =
+        Regex(
+            "([\\dIlL]+(?:[.,]\\d+)?)\\s*km\\s*\\(\\s*R\\$\\s*\\d+(?:[.,]\\d+)?\\s*/\\s*km\\s*\\)",
+            RegexOption.IGNORE_CASE,
+        )
+    // Metricas principais da oferta: tempo total e valor por minuto.
     private val offerMinutesRegex =
         Regex(
             "((?:(?:\\d+)\\s*hora(?:s)?\\s*)?(?:\\d+)\\s*min)\\s*\\(\\s*R\\$\\s*\\d+(?:[.,]\\d+)?\\s*/\\s*min\\s*\\)",
             RegexOption.IGNORE_CASE,
         )
+    // Marcadores que confirmam que a tela e uma chamada acionavel, nao historico ou resumo.
     private val actionMarkers =
         listOf(
             "deslize para recusar",
@@ -32,6 +55,9 @@ class MoveSjParser {
             "recusar",
             "aceitar",
         )
+
+    // Linha reconhecida pelo OCR com sua caixa na tela. A posicao e essencial para separar
+    // passageiro, valor, mapa, origem e destino quando o OCR mistura tudo em uma lista.
     data class OcrLine(
         val text: String,
         val left: Int,
@@ -47,10 +73,12 @@ class MoveSjParser {
         rawText: String,
         lines: List<String>,
     ): Map<String, Any>? {
+        // Entrada mais simples: so texto, sem coordenadas. Serve como fallback e para testes.
         if (rawText.isBlank()) {
             return null
         }
 
+        // Antes de extrair campos, confirma se o texto tem cara de oferta real.
         if (!isOfferScreenFromLines(lines)) {
             return null
         }
@@ -66,6 +94,7 @@ class MoveSjParser {
         rawText: String,
         ocrLines: List<OcrLine>,
     ): Map<String, Any>? {
+        // Caminho principal da leitura de tela: texto + coordenadas vindos do ML Kit.
         if (rawText.isBlank() || ocrLines.isEmpty()) {
             return null
         }
@@ -76,6 +105,7 @@ class MoveSjParser {
                 .sortedWith(compareBy<OcrLine> { it.top }.thenBy { it.left })
 
         val textLines = orderedLines.map { it.text.trim() }
+        // Uma tela so vira corrida se tiver preco, metricas e aceitar/recusar.
         if (!isOfferScreenFromLines(textLines)) {
             return null
         }
@@ -90,6 +120,8 @@ class MoveSjParser {
         val kmTotal = (offerData["km_total"] as? Number)?.toDouble() ?: 0.0
         val totalMinutes = (offerData["minutos_total"] as? Number)?.toInt() ?: 0
 
+        // A deteccao de MoveSJ em tempo real e conservadora: sem rota completa e sem metrica,
+        // o servico nao salva corrida para evitar falso positivo.
         if (originAddress.isBlank() || destinationAddress.isBlank() || kmTotal <= 0.0 || totalMinutes <= 0) {
             return null
         }
@@ -102,6 +134,7 @@ class MoveSjParser {
         priceText: String = "R$ 0,00",
         ratingText: String? = null,
     ): Map<String, Any> {
+        // Monta o payload no contrato consumido pelo ScreenReaderService/Flutter.
         val parsedOffer = extractOfferDetails(lines)
 
         return mutableMapOf<String, Any>(
@@ -121,20 +154,32 @@ class MoveSjParser {
         rawText: String,
         ocrLines: List<OcrLine>,
     ): Map<String, Any> {
-        val textLines = ocrLines.map { it.text.trim() }
-        val parsedOffer = extractOfferDetailsFromOcrLines(ocrLines)
+        // A tela e dividida uma unica vez em regioes dinamicas ancoradas no proprio card.
+        // Isso evita que textos do mapa concorram com nome, valor e enderecos.
+        val normalizedLines = normalizeOcrLines(ocrLines)
+        val regions = buildDynamicOcrRegions(normalizedLines)
+        val textLines = normalizedLines.map { it.text }
+        val parsedOffer = extractOfferDetailsFromOcrRegions(regions)
+        val price =
+            extractBestPrice(rawText, regions.priceLines)
+                ?: extractBestPrice(rawText, normalizedLines)
+                ?: "R$ 0,00"
+        val rating =
+            extractBestRating(regions.passengerLines, regions.pageWidth)
+                ?: extractBestRating(normalizedLines)
 
         return mutableMapOf<String, Any>(
             "app" to "MoveSj",
             "platform_name" to "MoveSj",
-            "valor_bruto" to (extractBestPrice(rawText, ocrLines) ?: "R$ 0,00"),
+            "valor_bruto" to price,
             "km_total" to parsedOffer.metrics.totalKm,
             "minutos_total" to parsedOffer.metrics.totalMinutes,
-            "avaliacao" to sanitizeRating(extractBestRating(ocrLines)),
+            "avaliacao" to sanitizeRating(rating),
             "passenger_name" to (parsedOffer.passengerName ?: ""),
             "origin_address" to (parsedOffer.originAddress ?: ""),
             "destination_address" to (parsedOffer.destinationAddress ?: ""),
         ).also {
+            // Fallback textual para metricas quando a analise posicional nao encontrou km/min.
             if (it["km_total"] == 0.0 || it["minutos_total"] == 0) {
                 val fallback = extractOfferDetails(textLines)
                 it["km_total"] = fallback.metrics.totalKm
@@ -142,8 +187,9 @@ class MoveSjParser {
             }
         }
     }
-
     internal fun isOfferScreenFromLines(lines: List<String>): Boolean {
+        // Regra de entrada do parser: a tela precisa ter valor, metricas de oferta e acao.
+        // Isso impede que telas como historico/ganhos sejam interpretadas como corrida.
         val normalizedLines = normalizeVisibleTexts(lines)
         val hasMainPrice = normalizedLines.any { priceRegex.containsMatchIn(it) }
         val hasMetrics =
@@ -159,6 +205,7 @@ class MoveSjParser {
     }
 
     private fun extractOfferDetails(lines: List<String>): MoveSjParsedOffer {
+        // Extracao textual pura, usada quando nao ha coordenadas ou como fallback.
         val normalizedLines = normalizeVisibleTexts(lines)
         val passengerName = extractPassengerName(normalizedLines)
         val addresses = extractAddresses(normalizedLines, passengerName)
@@ -174,6 +221,8 @@ class MoveSjParser {
     }
 
     private fun extractOfferMetrics(lines: List<String>): MoveSjOfferMetrics {
+        // Primeiro tenta ler as metricas principais da oferta:
+        // "8,0 km (R$ .../km)" e "22 min (R$ .../min)".
         var totalKm = 0.0
         var totalMinutes = 0
 
@@ -183,8 +232,7 @@ class MoveSjParser {
                     offerDistanceRegex.find(line)
                         ?.groupValues
                         ?.getOrNull(1)
-                        ?.replace(",", ".")
-                        ?.toDoubleOrNull()
+                        ?.let(::parseOcrDecimalNumber)
                 if (kmValue != null && kmValue > 0) {
                     totalKm = kmValue
                 }
@@ -202,6 +250,8 @@ class MoveSjParser {
             }
         }
 
+        // Se as metricas principais falharem, soma os trechos da rota:
+        // origem -> parada -> destino. Isso salva casos onde a MoveSJ exibe so os passos.
         if (totalKm <= 0 || totalMinutes <= 0) {
             var fallbackKm = 0.0
             var fallbackMinutes = 0
@@ -244,12 +294,23 @@ class MoveSjParser {
         )
     }
 
-    private fun extractOfferDetailsFromOcrLines(ocrLines: List<OcrLine>): MoveSjParsedOffer {
-        val normalizedLines = normalizeOcrLines(ocrLines)
-        val textLines = normalizedLines.map { it.text }
-        val passengerName = extractPassengerNameFromOcrLines(normalizedLines)
-        val addresses = extractAddressesFromOcrLines(normalizedLines, passengerName)
-        val offerMetrics = extractOfferMetrics(textLines)
+    private fun extractOfferDetailsFromOcrRegions(regions: MoveSjOcrRegions): MoveSjParsedOffer {
+        val passengerName =
+            extractPassengerNameFromOcrLines(
+                lines = regions.passengerLines,
+                pageWidth = regions.pageWidth,
+                cardTop = regions.cardTop,
+                firstRouteTop = regions.firstRouteTop,
+            )
+        val addresses = extractAddressesFromOcrLines(regions.routeLines, passengerName)
+        val offerMetrics =
+            extractOfferMetrics(regions.metricLines.map { it.text }).let { regionalMetrics ->
+                if (regionalMetrics.totalKm > 0 && regionalMetrics.totalMinutes > 0) {
+                    regionalMetrics
+                } else {
+                    extractOfferMetrics(regions.allLines.map { it.text })
+                }
+            }
 
         return MoveSjParsedOffer(
             passengerName = passengerName,
@@ -260,7 +321,79 @@ class MoveSjParser {
         )
     }
 
+    private fun buildDynamicOcrRegions(lines: List<OcrLine>): MoveSjOcrRegions {
+        val pageWidth = inferPageWidth(lines)
+        val firstRouteTop = firstRouteTop(lines)
+        val mainPriceLine = resolveBestPriceLine(lines)
+        val refuseBottom =
+            lines
+                .filter { normalizedText(it.text).contains("recusar") }
+                .maxOfOrNull { it.bottom }
+        val cardTop =
+            listOfNotNull(refuseBottom, mainPriceLine?.top?.minus(120))
+                .minOrNull()
+                ?.coerceAtLeast(0)
+                ?: 0
+        val cardBottom =
+            listOf(firstRouteTop, mainPriceLine?.bottom?.plus(320) ?: Int.MAX_VALUE)
+                .minOrNull()
+                ?: firstRouteTop
+        val broadPassengerLines =
+            lines.filter { line ->
+                line.left < pageWidth * 0.40f &&
+                    line.top >= cardTop &&
+                    line.top < cardBottom
+            }
+        val ratingLine =
+            resolvePassengerCardRatingLine(
+                lines = broadPassengerLines,
+                pageWidth = pageWidth,
+                cardTop = cardTop,
+                cardBottom = cardBottom,
+            )
+        val passengerTop =
+            ratingLine
+                ?.top
+                ?.minus(180)
+                ?.coerceAtLeast(cardTop)
+                ?: cardTop
+        val passengerLines =
+            broadPassengerLines.filter { line ->
+                line.bottom >= passengerTop &&
+                    line.top <= (ratingLine?.bottom?.plus(24) ?: cardBottom)
+            }
+        val priceLines =
+            lines.filter { line ->
+                line.top >= cardTop &&
+                    line.top < cardBottom &&
+                    line.centerX > pageWidth * 0.20f
+            }
+        val metricLines =
+            priceLines.filter { line ->
+                isOfferMetricContextLine(line.text) ||
+                    passengerCandidateNameFromNoisyMetricLine(line.text) != null
+            }
+        val routeLines =
+            if (firstRouteTop == Int.MAX_VALUE) {
+                lines
+            } else {
+                lines.filter { it.top >= firstRouteTop }
+            }
+
+        return MoveSjOcrRegions(
+            allLines = lines,
+            passengerLines = passengerLines,
+            priceLines = priceLines,
+            metricLines = metricLines,
+            routeLines = routeLines,
+            pageWidth = pageWidth,
+            cardTop = cardTop,
+            firstRouteTop = firstRouteTop,
+        )
+    }
     private fun normalizeOcrLines(ocrLines: List<OcrLine>): List<OcrLine> {
+        // Limpa linhas vazias, ordena de cima para baixo/esquerda para direita e remove
+        // repeticoes consecutivas que o OCR pode gerar no mesmo elemento visual.
         val normalizedLines = mutableListOf<OcrLine>()
 
         ocrLines
@@ -281,6 +414,8 @@ class MoveSjParser {
         lines: List<String>,
         rawText: String? = null,
     ): String? {
+        // Escolhe o valor principal da chamada. O maior risco aqui e confundir
+        // "R$ X/km" ou "R$ X/min" com o valor bruto da corrida.
         val firstMetricIndex = lines.indexOfFirst(::isOfferMetricContextLine)
         val linesBeforeMetrics =
             if (firstMetricIndex > 0) {
@@ -305,16 +440,19 @@ class MoveSjParser {
                 priceRegex.containsMatchIn(line) && !isDerivedMetricPriceLine(line)
             }
         if (fallbackLine != null) {
-            return priceRegex.find(fallbackLine)?.value
+            return priceRegex.find(fallbackLine)?.value?.let(::normalizePriceText)
         }
 
-        return rawText?.let { priceRegex.find(it)?.value }
+        return rawText?.let { priceRegex.find(it)?.value?.let(::normalizePriceText) }
     }
 
     private fun extractBestPrice(
         rawText: String,
         ocrLines: List<OcrLine>,
     ): String? {
+        // Na tela real existem precos repetidos e precos derivados. A escolha usa:
+        // 1) estar antes das metricas, 2) nao ser /km ou /min, 3) area visual,
+        // 4) proximidade do centro, 5) posicao vertical.
         val normalizedLines = normalizeOcrLines(ocrLines)
         val firstMetricTop =
             normalizedLines
@@ -326,7 +464,7 @@ class MoveSjParser {
         val priceCandidates =
             normalizedLines
                 .mapNotNull { line ->
-                    val price = priceRegex.find(line.text)?.value ?: return@mapNotNull null
+                    val price = priceRegex.find(line.text)?.value?.let(::normalizePriceText) ?: return@mapNotNull null
                     PriceCandidate(
                         price = price,
                         line = line,
@@ -356,6 +494,8 @@ class MoveSjParser {
     }
 
     private fun resolveBestPriceLine(ocrLines: List<OcrLine>): OcrLine? {
+        // Retorna a linha do valor principal para ajudar outros calculos posicionais,
+        // principalmente a area provavel do cartao do passageiro.
         val normalizedLines = normalizeOcrLines(ocrLines)
         val firstMetricTop =
             normalizedLines
@@ -366,7 +506,7 @@ class MoveSjParser {
 
         return normalizedLines
             .mapNotNull { line ->
-                val price = priceRegex.find(line.text)?.value ?: return@mapNotNull null
+                val price = priceRegex.find(line.text)?.value?.let(::normalizePriceText) ?: return@mapNotNull null
                 PriceCandidate(
                     price = price,
                     line = line,
@@ -388,29 +528,46 @@ class MoveSjParser {
     }
 
     private fun extractPriceFromCandidateLine(line: String): String? {
+        // So aceita linha que seja praticamente o preco puro. Linhas de metrica sao descartadas.
         if (isDerivedMetricPriceLine(line)) {
             return null
         }
 
         return when {
-            priceRegex.matches(line.trim()) -> line.trim()
+            priceRegex.matches(line.trim()) -> normalizePriceText(line.trim())
             else -> null
         }
     }
 
+    private fun normalizePriceText(value: String): String {
+        val amount =
+            Regex("\\d+(?:[.,]\\d+)?")
+                .find(value)
+                ?.value
+                ?.replace(".", ",")
+                ?: return value.trim()
+
+        return "R$ $amount"
+    }
+
     private fun isDerivedMetricPriceLine(line: String): Boolean {
+        // Preco derivado e o valor por km/min, nao o valor bruto da corrida.
         val normalized = normalizedText(line)
         return normalized.contains("/km") || normalized.contains("/min")
     }
 
     private fun isOfferMetricContextLine(line: String): Boolean {
+        // Qualquer linha de metrica define a regiao depois do valor principal.
         return offerDistanceRegex.containsMatchIn(line) ||
             offerMinutesRegex.containsMatchIn(line) ||
             isDerivedMetricPriceLine(line)
     }
 
-    private fun extractBestRating(ocrLines: List<OcrLine>): String? {
-        val pageWidth = inferPageWidth(ocrLines)
+    private fun extractBestRating(
+        ocrLines: List<OcrLine>,
+        pageWidth: Int = inferPageWidth(ocrLines),
+    ): String? {
+        // A avaliacao costuma ficar no card do passageiro, no lado esquerdo da tela.
         return ocrLines.firstOrNull { line ->
             line.centerX < pageWidth * 0.45f &&
                 (ratingRegex.containsMatchIn(line.text) || ratingValueRegex.matches(line.text.trim()))
@@ -418,6 +575,7 @@ class MoveSjParser {
     }
 
     private fun normalizeVisibleTexts(lines: List<String>): List<String> {
+        // Normalizacao simples para fluxo textual: remove vazios e duplicados consecutivos.
         val normalizedLines = mutableListOf<String>()
 
         lines.forEach { rawLine ->
@@ -437,6 +595,7 @@ class MoveSjParser {
     }
 
     private fun extractPassengerName(lines: List<String>): String? {
+        // Sem coordenadas, tenta encontrar o passageiro perto da avaliacao ou antes das metricas.
         val ratingIndex =
             lines.indexOfFirst { line ->
                 ratingRegex.containsMatchIn(line) || ratingValueRegex.matches(line.trim())
@@ -462,65 +621,90 @@ class MoveSjParser {
         return null
     }
 
-    private fun extractPassengerNameFromOcrLines(lines: List<OcrLine>): String? {
-        val pageWidth = inferPageWidth(lines)
-        val firstRouteTop = firstRouteTop(lines)
-        val refuseBottom =
-            lines
-                .filter { normalizedText(it.text).contains("recusar") }
-                .maxOfOrNull { it.bottom }
-        val mainPriceLine = resolveBestPriceLine(lines)
-        val cardTop =
-            listOfNotNull(refuseBottom, mainPriceLine?.top?.minus(80))
-                .minOrNull()
-                ?: 0
+    private fun extractPassengerNameFromOcrLines(
+        lines: List<OcrLine>,
+        pageWidth: Int,
+        cardTop: Int,
+        firstRouteTop: Int,
+    ): String? {
+        // O nome so concorre com textos da regiao esquerda do card e continua ancorado na nota.
         val cardBottom =
-            listOf(firstRouteTop, mainPriceLine?.bottom?.plus(260) ?: Int.MAX_VALUE)
-                .minOrNull()
+            lines.maxOfOrNull { it.bottom }
+                ?.coerceAtMost(firstRouteTop)
                 ?: firstRouteTop
-        val firstMetricTop =
-            lines.firstOrNull { offerDistanceRegex.containsMatchIn(it.text) || offerMinutesRegex.containsMatchIn(it.text) }
-                ?.top
-                ?: Int.MAX_VALUE
+        val ratingLine = resolvePassengerCardRatingLine(lines, pageWidth, cardTop, cardBottom)
+            ?: return extractPassengerNameFromPassengerCardArea(
+                lines = lines,
+                pageWidth = pageWidth,
+                cardTop = cardTop,
+                firstRouteTop = firstRouteTop,
+            )
 
-        val ratingLine =
-            lines.firstOrNull { line ->
-                isInsidePassengerCardArea(line, pageWidth, cardTop, cardBottom) &&
-                    (ratingRegex.containsMatchIn(line.text) || ratingValueRegex.matches(line.text.trim()))
-            }
-
-        if (ratingLine != null) {
-            passengerCandidateName(ratingLine.text)?.let { return it }
-
-            lines
-                .filter { it.bottom <= ratingLine.top && isInsidePassengerCardArea(it, pageWidth, cardTop, cardBottom) }
-                .sortedByDescending { it.top }
-                .firstNotNullOfOrNull { passengerCandidateName(it.text) }
-                ?.let { return it }
-        }
-
-        lines
-            .filter { isInsidePassengerCardArea(it, pageWidth, cardTop, cardBottom) }
-            .sortedWith(compareBy<OcrLine> { it.top }.thenBy { it.left })
-            .firstNotNullOfOrNull { passengerCandidateName(it.text) }
-            ?.let { return it }
-
-        if (firstMetricTop < Int.MAX_VALUE) {
-            lines
-                .filter {
-                    it.centerX < pageWidth * 0.45f &&
-                        it.top >= cardTop &&
-                        it.top < firstMetricTop
-                }
-                .sortedByDescending { it.top }
-                .firstNotNullOfOrNull { passengerCandidateName(it.text) }
-                ?.let { return it }
-        }
+        // Alguns OCRs juntam "Nome 5,00" na mesma linha; outros separam nome e nota.
+        passengerCandidateName(ratingLine.text)?.let { return it }
 
         return lines
-            .filter { it.centerX < pageWidth * 0.45f && it.top >= cardTop && it.top < firstRouteTop }
+            .filter { line ->
+                isPassengerNameLineAboveRating(line, ratingLine, pageWidth, cardTop, firstRouteTop)
+            }
             .sortedByDescending { it.top }
             .firstNotNullOfOrNull { passengerCandidateName(it.text) }
+            ?: extractPassengerNameFromPassengerCardArea(
+                lines = lines,
+                pageWidth = pageWidth,
+                cardTop = cardTop,
+                firstRouteTop = firstRouteTop,
+            )
+    }
+
+    private fun extractPassengerNameFromPassengerCardArea(
+        lines: List<OcrLine>,
+        pageWidth: Int,
+        cardTop: Int,
+        firstRouteTop: Int,
+    ): String? {
+        return lines
+            .filter { line ->
+                line.left < pageWidth * 0.35f &&
+                    line.top >= cardTop &&
+                    line.top < firstRouteTop &&
+                    line.text.any { it.isLetter() }
+            }
+            .sortedByDescending { it.top }
+            .firstNotNullOfOrNull { line ->
+                passengerCandidateNameFromNoisyMetricLine(line.text)
+                    ?: passengerCandidateName(line.text)
+            }
+    }
+
+    private fun resolvePassengerCardRatingLine(
+        lines: List<OcrLine>,
+        pageWidth: Int,
+        cardTop: Int,
+        cardBottom: Int,
+    ): OcrLine? {
+        return lines
+            .filter { line ->
+                isInsidePassengerCardArea(line, pageWidth, cardTop, cardBottom) &&
+                    isPassengerRatingLine(line.text)
+            }
+            .sortedBy { it.top }
+            .firstOrNull()
+    }
+
+    private fun isPassengerNameLineAboveRating(
+        line: OcrLine,
+        ratingLine: OcrLine,
+        pageWidth: Int,
+        cardTop: Int,
+        firstRouteTop: Int,
+    ): Boolean {
+        val verticalGap = ratingLine.top - line.bottom
+        return line.centerX < pageWidth * 0.45f &&
+            line.top >= cardTop &&
+            line.bottom <= ratingLine.top &&
+            line.top < firstRouteTop &&
+            verticalGap in -8..90
     }
 
     private fun isPassengerCandidate(line: String): Boolean {
@@ -528,13 +712,16 @@ class MoveSjParser {
     }
 
     private fun passengerCandidateName(line: String): String? {
+        // Filtro agressivo para evitar usar bairro, mapa, botao, valor ou texto fixo como passageiro.
         val candidate = stripRatingFromPassengerCandidate(line)
         val normalized = normalizedText(line)
         val candidateNormalized = normalizedText(candidate)
         return candidate.takeIf {
             candidate.length in 3..30 &&
             candidate.any { it.isLetter() } &&
+            (!line.contains(",") || isPassengerRatingLine(line)) &&
             !candidate.contains(",") &&
+            (!line.any { it.isDigit() } || isPassengerRatingLine(line)) &&
             !candidate.any { it.isDigit() } &&
             !normalized.contains("deslize") &&
             !isRouteMetricLine(candidate) &&
@@ -557,11 +744,64 @@ class MoveSjParser {
         }
     }
 
+    private fun passengerCandidateNameFromNoisyMetricLine(line: String): String? {
+        val beforeMetric =
+            line
+                .replace(
+                    Regex(
+                        "(?i)(?:[\\dIlL]+(?:[.,]\\d+)?\\s*(?:km|m)|\\d+\\s*min|R\\$|RS).*$",
+                    ),
+                    "",
+                ).replace(Regex("[^\\p{L}\\s'.-]+"), " ")
+                .trim()
+
+        val firstToken = beforeMetric.split(Regex("\\s+")).firstOrNull().orEmpty()
+        val repairedToken = repairNoisyPassengerToken(firstToken)
+
+        return passengerCandidateName(repairedToken)
+    }
+
+    private fun repairNoisyPassengerToken(token: String): String {
+        val trimmed = token.trim('.', '\'', '-', ' ')
+        val normalized = normalizedText(trimmed)
+        val noisySuffixes = listOf("stb", "std", "sta")
+        val suffix = noisySuffixes.firstOrNull { normalized.endsWith(it) }
+
+        return if (suffix != null && trimmed.length > suffix.length + 2) {
+            trimmed.dropLast(suffix.length)
+        } else {
+            trimmed
+        }
+    }
+
     private fun stripRatingFromPassengerCandidate(line: String): String {
-        return line
+        // Remove nota quando OCR junta nome e avaliacao na mesma linha.
+        val withoutKnownRating = line
             .replace(ratingRegex, "")
             .replace(ratingValueRegex, "")
+            .replace(Regex("[^\\p{L}\\s'.-]+"), "")
             .trim()
+
+        if (line.contains(",")) {
+            return withoutKnownRating
+        }
+
+        return withoutKnownRating
+            .replace(Regex("\\s+\\d(?:[.,]\\d{1,2}).*$"), "")
+            .trim()
+    }
+
+    private fun isPassengerRatingLine(line: String): Boolean {
+        val normalized = normalizedText(line)
+        return !isRouteMetricLine(line) &&
+            !normalized.contains("r$") &&
+            !normalized.contains("/km") &&
+            !normalized.contains("/min") &&
+            (
+                ratingRegex.containsMatchIn(line) ||
+                    ratingValueRegex.matches(line.trim()) ||
+                    ratingNumberRegex.containsMatchIn(line)
+            )
     }
 
     private fun isInsidePassengerCardArea(
@@ -570,6 +810,7 @@ class MoveSjParser {
         cardTop: Int,
         cardBottom: Int,
     ): Boolean {
+        // O card do passageiro fica no lado esquerdo da chamada da MoveSJ.
         return line.centerX < pageWidth * 0.45f &&
             line.top >= cardTop &&
             line.top < cardBottom
@@ -579,10 +820,11 @@ class MoveSjParser {
         lines: List<String>,
         passengerName: String?,
     ): MoveSjRouteAddresses {
+        // Fluxo textual: cada trecho de rota indica que as proximas linhas formam um endereco.
         val routeAddresses = mutableListOf<String>()
 
         lines.forEachIndexed { index, line ->
-            if (!routeStepRegex.containsMatchIn(line)) {
+            if (!isRouteStepAnchorLine(line)) {
                 return@forEachIndexed
             }
 
@@ -598,6 +840,7 @@ class MoveSjParser {
         }
 
         val fallbackAddresses = buildFallbackAddressBlocks(lines, passengerName)
+        // Junta candidatos do caminho principal e fallback, removendo duplicatas.
         val distinctAddresses = distinctAddressBlocks(routeAddresses + fallbackAddresses)
 
         return toRouteAddresses(distinctAddresses)
@@ -607,15 +850,17 @@ class MoveSjParser {
         lines: List<OcrLine>,
         passengerName: String?,
     ): MoveSjRouteAddresses {
+        // Fluxo posicional: usa a coordenada vertical de cada trecho para pegar o endereco abaixo
+        // dele e parar antes do proximo trecho.
         val routeLines =
             lines
                 .filter { line ->
-                    routeStepRegex.containsMatchIn(line.text) &&
-                        !line.text.contains("R$", ignoreCase = true)
+                    isPositionedRouteStepAnchorLine(line, lines)
                 }
                 .sortedBy { it.top }
 
         if (routeLines.isEmpty()) {
+            // Se o OCR nao achou trechos posicionais, volta para a estrategia textual.
             return extractAddresses(lines.map { it.text }, passengerName)
         }
 
@@ -632,6 +877,7 @@ class MoveSjParser {
 
         val distinctAddresses = distinctAddressBlocks(addressBlocks)
         if (distinctAddresses.size >= 2) {
+            // Com duas ou mais rotas, primeira e origem; ultima e destino.
             return toRouteAddresses(distinctAddresses)
         }
 
@@ -639,6 +885,7 @@ class MoveSjParser {
     }
 
     private fun toRouteAddresses(addresses: List<String>): MoveSjRouteAddresses {
+        // Se houver parada, o destino deve ser o ultimo endereco, nao o segundo.
         val originAddress = addresses.firstOrNull()
         val destinationAddress =
             when {
@@ -658,6 +905,7 @@ class MoveSjParser {
         nextRouteTop: Int,
         passengerName: String?,
     ): String? {
+        // Captura linhas de endereco entre o trecho atual e o proximo trecho de rota.
         val collected = mutableListOf<String>()
         extractInlineAddressFromRouteLine(routeLine.text, passengerName)?.let(collected::add)
 
@@ -665,7 +913,7 @@ class MoveSjParser {
             .filter { line ->
                 line.top > routeLine.top &&
                     line.top < nextRouteTop &&
-                    isAddressCandidate(line.text, passengerName)
+                    isRouteAddressCandidate(line.text, passengerName)
             }
             .sortedWith(compareBy<OcrLine> { it.top }.thenBy { it.left })
             .forEach { line ->
@@ -680,17 +928,18 @@ class MoveSjParser {
         startIndex: Int,
         passengerName: String?,
     ): String? {
+        // Captura o bloco de endereco em texto corrido, logo apos a linha do trecho.
         val collected = mutableListOf<String>()
         val routeLine = lines.getOrNull(startIndex - 1)
         extractInlineAddressFromRouteLine(routeLine, passengerName)?.let(collected::add)
 
         for (index in startIndex until lines.size) {
             val candidate = lines[index]
-            if (routeStepRegex.containsMatchIn(candidate)) {
+            if (isRouteStepBoundaryLine(candidate)) {
                 break
             }
 
-            if (!isAddressCandidate(candidate, passengerName)) {
+            if (!isRouteAddressCandidate(candidate, passengerName)) {
                 if (collected.isNotEmpty()) {
                     break
                 }
@@ -712,13 +961,14 @@ class MoveSjParser {
         routeLine: String?,
         passengerName: String?,
     ): String? {
+        // Algumas leituras vem como "1,5 km (4 min) Rua X". Aqui separa so a parte do endereco.
         if (routeLine.isNullOrBlank()) {
             return null
         }
 
-        val routeMatch = routeStepRegex.find(routeLine) ?: return null
+        val routeMatch = routeStepPrefixRegex.find(routeLine) ?: return null
         val inlineAddress = routeLine.substring(routeMatch.range.last + 1).trim()
-        if (!isAddressCandidate(inlineAddress, passengerName)) {
+        if (!isRouteAddressCandidate(inlineAddress, passengerName)) {
             return null
         }
 
@@ -729,6 +979,8 @@ class MoveSjParser {
         lines: List<String>,
         passengerName: String?,
     ): List<String> {
+        // Fallback para quando os marcadores de trecho nao organizam bem o texto.
+        // Ele acumula blocos que parecem endereco e quebra ao encontrar algo que nao parece.
         val blocks = mutableListOf<String>()
         val currentBlock = mutableListOf<String>()
 
@@ -741,7 +993,7 @@ class MoveSjParser {
         }
 
         for (line in lines) {
-            if (routeStepRegex.containsMatchIn(line)) {
+            if (isRouteStepBoundaryLine(line)) {
                 flushCurrentBlock()
                 continue
             }
@@ -762,6 +1014,7 @@ class MoveSjParser {
     }
 
     private fun distinctAddressBlocks(blocks: List<String>): List<String> {
+        // Remove enderecos repetidos comparando texto normalizado sem espacos.
         val distinctBlocks = mutableListOf<String>()
         val seen = mutableSetOf<String>()
 
@@ -778,6 +1031,7 @@ class MoveSjParser {
     }
 
     private fun joinAddressLines(lines: List<String>): String? {
+        // Enderecos longos geralmente chegam quebrados em varias linhas.
         return lines
             .map { it.trim() }
             .filter { it.isNotEmpty() }
@@ -789,6 +1043,8 @@ class MoveSjParser {
         line: String,
         passengerName: String?,
     ): Boolean {
+        // Decide se uma linha pode ser parte de endereco. Rejeita botoes, metricas, preco,
+        // passageiro e textos fixos para reduzir falso positivo.
         val normalized = normalizedText(line)
         val hasStreetLikeStructure =
             line.length >= 6 &&
@@ -812,27 +1068,88 @@ class MoveSjParser {
             !ratingValueRegex.matches(line.trim())
     }
 
+    private fun isRouteAddressCandidate(
+        line: String,
+        passengerName: String?,
+    ): Boolean {
+        return isAddressCandidate(line, passengerName) || isPlaceNameCandidate(line, passengerName)
+    }
+
+    private fun isPlaceNameCandidate(
+        line: String,
+        passengerName: String?,
+    ): Boolean {
+        val trimmed = line.trim()
+        val normalized = normalizedText(trimmed)
+        val words = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
+
+        return trimmed.length in 5..80 &&
+            trimmed.any { it.isLetter() } &&
+            words.size <= 6 &&
+            (passengerName == null || normalized != normalizedText(passengerName)) &&
+            !normalized.contains("move") &&
+            !normalized.contains("movesj") &&
+            !normalized.contains("deslize") &&
+            !normalized.contains("aceitar") &&
+            !normalized.contains("recusar") &&
+            !isRouteMetricLine(trimmed) &&
+            !normalized.contains("r$") &&
+            !normalized.contains("pix") &&
+            !normalized.contains("cartao") &&
+            !normalized.contains("dinheiro") &&
+            !normalized.contains("motorista") &&
+            !ratingRegex.containsMatchIn(trimmed) &&
+            !ratingValueRegex.matches(trimmed)
+    }
+
     private fun isRouteMetricLine(line: String): Boolean {
-        return routeStepRegex.containsMatchIn(line) ||
+        // Qualquer metrica de rota/oferta nao pode virar passageiro nem endereco.
+        return isRouteStepBoundaryLine(line) ||
             offerDistanceRegex.containsMatchIn(line) ||
             offerMinutesRegex.containsMatchIn(line)
     }
 
+    private fun isRouteStepBoundaryLine(line: String): Boolean {
+        return isRouteStepAnchorLine(line) || routeDurationOnlyRegex.matches(line.trim())
+    }
+
+    private fun isRouteStepAnchorLine(line: String): Boolean {
+        val trimmed = line.trim()
+        return trimmed.isNotEmpty() &&
+            !isDerivedMetricPriceLine(trimmed) &&
+            !priceRegex.containsMatchIn(trimmed) &&
+            (routeStepRegex.containsMatchIn(trimmed) || routeStepAnchorRegex.matches(trimmed))
+    }
+
+    private fun isPositionedRouteStepAnchorLine(
+        line: OcrLine,
+        allLines: List<OcrLine>,
+    ): Boolean {
+        if (!isRouteStepAnchorLine(line.text)) {
+            return false
+        }
+
+        val pageWidth = inferPageWidth(allLines)
+        return line.centerX < pageWidth * 0.55f
+    }
+
     private fun inferPageWidth(lines: List<OcrLine>): Int {
+        // A largura inferida permite raciocinar sobre lado esquerdo/centro da tela.
         return lines.maxOfOrNull { it.right }?.coerceAtLeast(1) ?: 1
     }
 
     private fun firstRouteTop(lines: List<OcrLine>): Int {
+        // Inicio da rota na tela. Ajuda a separar card do passageiro de enderecos.
         return lines
             .filter { line ->
-                routeStepRegex.containsMatchIn(line.text) &&
-                    !line.text.contains("R$", ignoreCase = true)
+                isPositionedRouteStepAnchorLine(line, lines)
             }
             .minOfOrNull { it.top }
             ?: Int.MAX_VALUE
     }
 
     private fun normalizedText(value: String?): String {
+        // Normalizacao para comparacoes robustas: remove acentos e deixa minusculo.
         if (value.isNullOrBlank()) {
             return ""
         }
@@ -845,16 +1162,16 @@ class MoveSjParser {
     }
 
     private fun parseRouteDistanceKm(routeText: String): Double? {
+        // Converte distancia de trecho para km, aceitando "m" e "km".
         val match =
-            Regex("(\\d+(?:[.,]\\d+)?)\\s*(km|m)", RegexOption.IGNORE_CASE)
+            Regex("([\\dIlL]+(?:[.,]\\d+)?)\\s*(km|m)", RegexOption.IGNORE_CASE)
                 .find(routeText)
                 ?: return null
 
         val rawValue =
             match.groupValues
                 .getOrNull(1)
-                ?.replace(",", ".")
-                ?.toDoubleOrNull()
+                ?.let(::parseOcrDecimalNumber)
                 ?: return null
         val unit = match.groupValues.getOrNull(2)?.lowercase()
 
@@ -865,7 +1182,16 @@ class MoveSjParser {
         }
     }
 
+    private fun parseOcrDecimalNumber(value: String): Double? {
+        return value
+            .replace("I", "1", ignoreCase = true)
+            .replace("l", "1", ignoreCase = true)
+            .replace(",", ".")
+            .toDoubleOrNull()
+    }
+
     private fun parseDurationMinutes(durationText: String): Int? {
+        // Converte "1 hora 6 min" ou "22 min" para minutos totais.
         val normalized = normalizedText(durationText)
         val hourMatch = Regex("(\\d+)\\s*hora").find(normalized)
         val minuteMatch = Regex("(\\d+)\\s*min").find(normalized)
@@ -878,10 +1204,12 @@ class MoveSjParser {
     }
 
     private fun roundKm(value: Double): Double {
+        // Mantem tres casas por truncamento, seguindo o comportamento original do parser.
         return (value * 1000).toInt() / 1000.0
     }
 
     private fun sanitizeRating(ratingText: String?): String {
+        // Remove estrela e usa 5,00 como padrao quando a tela nao trouxe avaliacao confiavel.
         return ratingText
             ?.replace("\u2605", "")
             ?.replace("\u2B50", "")
@@ -891,13 +1219,26 @@ class MoveSjParser {
     }
 
     private fun extractRatingTextFromLine(line: String): String? {
+        // Extrai a nota tanto quando vem com estrela quanto quando vem so "5,00".
         return ratingRegex.find(line)?.value?.let(::sanitizeRating)
             ?: line.trim().takeIf { ratingValueRegex.matches(it) }?.let(::sanitizeRating)
     }
 
+    // Estruturas internas para manter as etapas do parser tipadas antes de virar Map.
     private data class MoveSjOfferMetrics(
         val totalKm: Double,
         val totalMinutes: Int,
+    )
+
+    private data class MoveSjOcrRegions(
+        val allLines: List<OcrLine>,
+        val passengerLines: List<OcrLine>,
+        val priceLines: List<OcrLine>,
+        val metricLines: List<OcrLine>,
+        val routeLines: List<OcrLine>,
+        val pageWidth: Int,
+        val cardTop: Int,
+        val firstRouteTop: Int,
     )
 
     private data class MoveSjParsedOffer(

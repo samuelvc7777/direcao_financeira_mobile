@@ -4,13 +4,24 @@ import java.text.Normalizer
 
 class NinetyNineOcrParser {
 
+    data class OcrLine(
+        val text: String,
+        val left: Int,
+        val top: Int,
+        val right: Int,
+        val bottom: Int,
+    ) {
+        val area: Int
+            get() = (right - left).coerceAtLeast(0) * (bottom - top).coerceAtLeast(0)
+    }
     private val priceRegex = Regex("R\\$\\s*\\d+(?:[.,]\\d+)?")
+    private val gainPerKmRegex = Regex("R\\$\\s*\\d+(?:[.,]\\d+)?\\s*/\\s*km", RegexOption.IGNORE_CASE)
     private val statsRegex =
-        Regex("(\\d+)\\s*min\\s*\\((\\d+(?:[.,]\\d+)?)\\s*km\\)", RegexOption.IGNORE_CASE)
+        Regex("(\\d+)\\s*min(?:utos?)?\\s*\\(([0-9Il]+(?:[.,]\\d+)?)\\s*(km|m)\\)", RegexOption.IGNORE_CASE)
     private val corridasLineRegex =
-        Regex("(\\d+(?:[.,]\\d+)?)\\s*(?:[\\u2022·•]|\\.)?\\s*(\\d+)\\s*corridas", RegexOption.IGNORE_CASE)
+        Regex("(?:^|[^\\d])([1-5](?:[.,]\\d{1,2})?)\\s*(?:[\\u2022·•]|\\.)?\\s+(\\d+)\\s*corridas\\b", RegexOption.IGNORE_CASE)
     private val ratingProfileLineRegex =
-        Regex("(\\d+(?:[.,]\\d+)?)\\s*(?:[\\u2022·•]|\\.)\\s*perfil\\b", RegexOption.IGNORE_CASE)
+        Regex("(?:^|[^\\d])([1-5](?:[.,]\\d{1,2})?)\\s*(?:[\\u2022·•]|\\.)\\s*perfil\\b", RegexOption.IGNORE_CASE)
     private val fallbackRatingRegex = Regex("\\b\\d(?:[.,]\\d{1,2})\\b")
     private val profileRegex =
         Regex("Perfil\\s+([A-Za-zÀ-ÿ]+(?:\\s+[A-Za-zÀ-ÿ]+)*)", RegexOption.IGNORE_CASE)
@@ -53,7 +64,13 @@ class NinetyNineOcrParser {
             normalizedText.contains("preco x") ||
                 normalizedText.contains("perfil") ||
                 normalizedText.contains("nao afeta a ta") ||
-                normalizedText.contains("aceitar por")
+                normalizedText.contains("aceitar por") ||
+                normalizedText.contains("corridas") ||
+                normalizedText.contains("tarifa base dinamica") ||
+                normalizedText.contains("prioritario") ||
+                normalizedText.contains("pgto") ||
+                normalizedText.contains("cpf verif") ||
+                normalizedText.contains("parada")
 
         if (stats.size < 2 && !hasMarkers) {
             return null
@@ -64,7 +81,7 @@ class NinetyNineOcrParser {
 
         stats.forEach { match ->
             totalMinutes += match.groupValues[1].toIntOrNull() ?: 0
-            totalKm += match.groupValues[2].replace(",", ".").toDoubleOrNull() ?: 0.0
+            totalKm += routeDistanceKm(match)
         }
 
         val passengerName = extractPassengerName(lines)
@@ -74,6 +91,7 @@ class NinetyNineOcrParser {
             put("app", "99")
             put("platform_name", "99")
             put("valor_bruto", price)
+            extractGainPerKm(rawText, lines)?.let { put("ganho_km", it) }
             put("km_total", totalKm)
             put("minutos_total", totalMinutes)
             put("avaliacao", extractRating(rawText, lines) ?: "5,00")
@@ -85,6 +103,95 @@ class NinetyNineOcrParser {
             put("tipo_corrida", extractOfferType(lines) ?: "")
             put("forma_pagamento", extractPaymentMethod(lines) ?: "")
         }
+    }
+
+    fun parsePositionedOffer(
+        rawText: String,
+        ocrLines: List<OcrLine>,
+    ): Map<String, Any>? {
+        if (rawText.isBlank() || ocrLines.isEmpty()) {
+            return null
+        }
+
+        val regions = buildDynamicRegions(ocrLines)
+        val cardLines = regions.cardLines.map { it.text }
+        val parsed = parseOffer(cardLines.joinToString("\n"), cardLines) ?: return null
+        val headerLines = regions.headerLines.map { it.text }
+        val profileLines = regions.profileLines.map { it.text }
+        val routeLines = regions.routeLines.map { it.text }
+        val passengerName = extractPassengerName(profileLines)
+        val addresses = extractAddresses(routeLines, passengerName)
+
+        return parsed.toMutableMap().apply {
+            put("passenger_name", passengerName ?: parsed["passenger_name"]?.toString().orEmpty())
+            put("perfil_passageiro", passengerName ?: parsed["perfil_passageiro"]?.toString().orEmpty())
+            put("origin_address", addresses.first ?: parsed["origin_address"]?.toString().orEmpty())
+            put("destination_address", addresses.second ?: parsed["destination_address"]?.toString().orEmpty())
+            put("tipo_corrida", extractOfferType(headerLines) ?: parsed["tipo_corrida"]?.toString().orEmpty())
+            put("forma_pagamento", extractPaymentMethod(headerLines) ?: parsed["forma_pagamento"]?.toString().orEmpty())
+            put(
+                "avaliacao",
+                extractRating(profileLines.joinToString("\n"), profileLines)
+                    ?: parsed["avaliacao"]?.toString().orEmpty(),
+            )
+            put(
+                "corridas_total",
+                extractRidesCount(profileLines.joinToString("\n"), profileLines)
+                    ?: parsed["corridas_total"]
+                    ?: 0,
+            )
+        }
+    }
+
+    private fun buildDynamicRegions(ocrLines: List<OcrLine>): NinetyNineOcrRegions {
+        val lines =
+            ocrLines
+                .map { it.copy(text = it.text.trim()) }
+                .filter { it.text.isNotEmpty() }
+                .sortedWith(compareBy<OcrLine> { it.top }.thenBy { it.left })
+        val firstRouteTop =
+            lines
+                .filter { statsRegex.containsMatchIn(it.text) }
+                .minOfOrNull { it.top }
+                ?: Int.MAX_VALUE
+        val mainPriceLine =
+            lines
+                .filter { line ->
+                    priceRegex.containsMatchIn(line.text) &&
+                        !normalize(line.text).contains("/km") &&
+                        line.top < firstRouteTop
+                }
+                .sortedWith(compareByDescending<OcrLine> { it.area }.thenBy { it.top })
+                .firstOrNull()
+                ?: return NinetyNineOcrRegions(lines, lines, lines, lines)
+        val priceHeight = (mainPriceLine.bottom - mainPriceLine.top).coerceAtLeast(1)
+        val cardTop = (mainPriceLine.top - priceHeight * 2).coerceAtLeast(0)
+        val cardLines = lines.filter { it.top >= cardTop }
+        val headerLines = cardLines.filter { it.top < firstRouteTop }
+        val profileLines =
+            headerLines.filter { line ->
+                val normalized = normalize(line.text)
+                line.top >= mainPriceLine.bottom &&
+                    (
+                        normalized.contains("perfil") ||
+                            normalized.contains("corridas") ||
+                            normalized.contains("passageiro") ||
+                            fallbackRatingRegex.containsMatchIn(line.text)
+                    )
+            }
+        val routeLines =
+            if (firstRouteTop == Int.MAX_VALUE) {
+                cardLines
+            } else {
+                cardLines.filter { it.top >= firstRouteTop }
+            }
+
+        return NinetyNineOcrRegions(
+            cardLines = cardLines,
+            headerLines = headerLines,
+            profileLines = profileLines,
+            routeLines = routeLines,
+        )
     }
 
     private fun extractPassengerName(lines: List<String>): String? {
@@ -120,14 +227,15 @@ class NinetyNineOcrParser {
                 return@forEachIndexed
             }
 
-            extractAddressFromStatLine(line, passengerName)?.let { address ->
-                addresses.add(address)
-                return@forEachIndexed
-            }
+            val addressParts = mutableListOf<String>()
+            extractAddressFromStatLine(line, passengerName)?.let(addressParts::add)
+            addressParts.addAll(
+                collectAddressContinuationParts(lines, startIndex = index + 1, passengerName = passengerName),
+            )
 
-            val nextAddress = findNextAddressCandidate(lines, startIndex = index + 1, passengerName = passengerName)
-            if (nextAddress != null) {
-                addresses.add(nextAddress)
+            val address = joinAddressParts(addressParts)
+            if (address != null) {
+                addresses.add(address)
             }
         }
 
@@ -138,6 +246,35 @@ class NinetyNineOcrParser {
         val originAddress = addresses.firstOrNull()
         val destinationAddress = addresses.drop(1).lastOrNull()
         return originAddress to destinationAddress
+    }
+
+    private fun routeDistanceKm(match: MatchResult): Double {
+        val value =
+            match.groupValues[2]
+                .replace("I", "1")
+                .replace("l", "1")
+                .replace(",", ".")
+                .toDoubleOrNull() ?: return 0.0
+        val unit = match.groupValues.getOrNull(3)?.lowercase().orEmpty()
+        return if (unit == "m") value / 1000.0 else value
+    }
+
+    private fun extractGainPerKm(
+        rawText: String,
+        lines: List<String>,
+    ): Double? {
+        val match =
+            lines.asSequence()
+                .filter { normalize(it).contains("/km") }
+                .mapNotNull { gainPerKmRegex.find(it) }
+                .firstOrNull()
+                ?: gainPerKmRegex.find(rawText)
+                ?: return null
+
+        return match.value
+            .replace(Regex("[^0-9,]"), "")
+            .replace(",", ".")
+            .toDoubleOrNull()
     }
 
     private fun extractAddressFromStatLine(
@@ -153,11 +290,13 @@ class NinetyNineOcrParser {
         return null
     }
 
-    private fun findNextAddressCandidate(
+    private fun collectAddressContinuationParts(
         lines: List<String>,
         startIndex: Int,
         passengerName: String?,
-    ): String? {
+    ): List<String> {
+        val parts = mutableListOf<String>()
+
         for (index in startIndex until lines.size) {
             val currentLine = lines[index].trim()
             if (currentLine.isEmpty()) {
@@ -165,15 +304,29 @@ class NinetyNineOcrParser {
             }
 
             if (statsRegex.containsMatchIn(currentLine)) {
-                return null
+                break
             }
 
             if (isAddressCandidate(currentLine, passengerName)) {
-                return currentLine
+                parts.add(currentLine)
+                continue
+            }
+
+            if (parts.isNotEmpty()) {
+                break
             }
         }
 
-        return null
+        return parts
+    }
+
+    private fun joinAddressParts(parts: List<String>): String? {
+        return parts
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
+            .takeIf { it.isNotBlank() }
     }
 
     private fun isAddressCandidate(
@@ -207,6 +360,7 @@ class NinetyNineOcrParser {
                 "cartao",
                 "entrega",
                 "negocia",
+                "parada",
                 "km",
                 "min",
                 "r$",
@@ -276,7 +430,7 @@ class NinetyNineOcrParser {
                     normalized.contains("entrega")
             } ?: return null
 
-        return line.split("•", "·").map { it.trim() }.firstOrNull {
+        return splitOfferLabels(line).map { it.trim() }.firstOrNull {
             val normalized = normalize(it)
             normalized.contains("negocia") ||
                 normalized.contains("entrega")
@@ -292,7 +446,7 @@ class NinetyNineOcrParser {
                     normalized.contains("cartao")
             } ?: return null
 
-        return line.split("•", "·").map { it.trim() }.firstOrNull {
+        return splitOfferLabels(line).map { it.trim() }.firstOrNull {
             val normalized = normalize(it)
             normalized.contains("dinheiro") ||
                 normalized.contains("pix") ||
@@ -300,6 +454,9 @@ class NinetyNineOcrParser {
         }
     }
 
+    private fun splitOfferLabels(line: String): List<String> {
+        return line.split(Regex("\\s*[\u2022\u00B7]\\s*"))
+    }
     private fun normalize(value: String): String {
         val normalized =
             Normalizer.normalize(value, Normalizer.Form.NFD)
@@ -307,4 +464,11 @@ class NinetyNineOcrParser {
 
         return normalized.lowercase()
     }
+
+    private data class NinetyNineOcrRegions(
+        val cardLines: List<OcrLine>,
+        val headerLines: List<OcrLine>,
+        val profileLines: List<OcrLine>,
+        val routeLines: List<OcrLine>,
+    )
 }

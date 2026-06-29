@@ -2102,7 +2102,9 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
     return Get.dialog<bool>(
       AlertDialog(
         title: Text(_locationDialogTitle(status)),
-        content: Text(_locationDialogMessage(status)),
+        content: SingleChildScrollView(
+          child: Text(_locationDialogMessage(status)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -2120,15 +2122,15 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
 
   String _locationDialogTitle(LocationTrackingStatusEntity status) {
     if (!status.isLocationServiceEnabled) {
-      return 'Ativar localizacao';
-    }
-
-    if (!status.hasBackgroundPermission) {
-      return 'Permitir o tempo todo';
+      return 'Uso da localizacao';
     }
 
     if (!status.hasForegroundPermission) {
-      return 'Liberar localizacao';
+      return 'Uso da localizacao';
+    }
+
+    if (!status.hasBackgroundPermission) {
+      return 'Localizacao em segundo plano';
     }
 
     if (!status.isPreciseLocation) {
@@ -2139,20 +2141,25 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
   }
 
   String _locationDialogMessage(LocationTrackingStatusEntity status) {
-    if (!status.isLocationServiceEnabled) {
-      return 'Para iniciar o turno, ative o GPS do aparelho. O rastreamento da jornada depende da localizacao ligada durante todo o turno.';
-    }
+    const prominentDisclosure =
+        'O Direcao Financeira usa sua localizacao para registrar a rota do turno, calcular distancia percorrida, tempo de jornada, custos e metricas financeiras do trabalho.\n\n'
+        'Durante um turno ativo, o app precisa continuar acessando a localizacao mesmo em segundo plano ou com o app fechado. O rastreamento comeca quando voce inicia um turno e para quando voce finaliza o turno.\n\n'
+        'Voce pode negar essa permissao. Nesse caso, o rastreamento automatico da jornada nao funcionara corretamente.';
 
-    if (!status.hasBackgroundPermission) {
-      return 'Para iniciar o turno, abra as configuracoes do app e marque a localizacao como "Permitir o tempo todo". Assim a jornada continua sendo rastreada mesmo com o app fechado.';
+    if (!status.isLocationServiceEnabled) {
+      return '$prominentDisclosure\n\nPara iniciar o turno, ative o GPS do aparelho.';
     }
 
     if (!status.hasForegroundPermission) {
-      return 'Para iniciar o turno, libere a localizacao do app nas configuracoes e volte para tentar novamente.';
+      return '$prominentDisclosure\n\nPara iniciar o turno, libere a localizacao do app nas configuracoes e volte para tentar novamente.';
+    }
+
+    if (!status.hasBackgroundPermission) {
+      return '$prominentDisclosure\n\nPara continuar, marque a localizacao como "Permitir o tempo todo" nas configuracoes do app.';
     }
 
     if (!status.isPreciseLocation) {
-      return 'Para iniciar o turno, troque a localizacao aproximada para precisa nas configuracoes do app.';
+      return '$prominentDisclosure\n\nPara iniciar o turno, troque a localizacao aproximada para precisa nas configuracoes do app.';
     }
 
     return 'Revise as configuracoes de localizacao antes de iniciar o turno.';

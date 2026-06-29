@@ -14,7 +14,6 @@ import '../../widgets/custom_app_bar.dart';
 import '../../widgets/premium_access_guard.dart';
 import 'transactions_controller.dart';
 import 'widgets/transaction_type_selector_sheet.dart';
-import 'widgets/transactions_card_recurring_section.dart';
 import 'widgets/transactions_day_group_section.dart';
 import 'widgets/transactions_empty_state.dart';
 import 'widgets/transactions_filter_tabs.dart';
@@ -44,7 +43,7 @@ class TransactionsView extends GetView<TransactionsController> {
         onPressed: () => PremiumAccessGuard().run(_openCreateTransactionFlow),
         backgroundColor: colorScheme.primary,
         elevation: 8,
-        child: Icon(Icons.add_rounded, color: colorScheme.onPrimary, size: 28),
+        child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
@@ -63,119 +62,76 @@ class TransactionsView extends GetView<TransactionsController> {
           symbol: 'R\$ ',
           decimalDigits: 0,
         );
-        final cardRecurringGroups =
-            controller.groupedCardRecurringVisibleTransactions;
-        final normalGroups = controller.groupedNormalVisibleTransactions;
-        final hasVisibleTransactions =
-            cardRecurringGroups.isNotEmpty || normalGroups.isNotEmpty;
-        final isCardRecurringSectionExpanded =
-            controller.isCardRecurringSectionExpanded.value;
-
         return LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 720;
             final horizontalPadding = isWide
                 ? 0.0
                 : Responsive.hp(context, 4.8).clamp(16.0, 18.0);
+            final verticalGapSmall = Responsive.vp(
+              context,
+              1.2,
+            ).clamp(8.0, 10.0);
+            final verticalGapMedium = Responsive.vp(
+              context,
+              2.2,
+            ).clamp(16.0, 18.0);
+            final listTopGap = Responsive.vp(context, 3).clamp(20.0, 24.0);
+            final bottomPadding = Responsive.vp(
+              context,
+              18,
+            ).clamp(132.0, 148.0);
 
             return Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
-                child: SingleChildScrollView(
+                child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
                     0,
                     horizontalPadding,
-                    Responsive.vp(context, 18).clamp(132.0, 148.0),
+                    0,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AppMonthSelector(
-                        label: controller.selectedMonthLabelUppercase,
-                        onPrevious: controller.goToPreviousMonth,
-                        onNext: controller.goToNextMonth,
-                      ),
-                      SizedBox(
-                        height: Responsive.vp(context, 1.2).clamp(8.0, 10.0),
-                      ),
-                      TransactionsSummaryCards(
-                        incomeAmount: currencyFormat.format(
-                          controller.totalIncomeCents / 100,
-                        ),
-                        expenseAmount: currencyFormat.format(
-                          controller.totalExpenseCents / 100,
-                        ),
-                        balanceAmount: currencyFormat.format(
-                          controller.balanceCents / 100,
+                      Obx(
+                        () => AppMonthSelector(
+                          label: controller.selectedMonthLabelUppercase,
+                          onPrevious: controller.goToPreviousMonth,
+                          onNext: controller.goToNextMonth,
                         ),
                       ),
-                      SizedBox(
-                        height: Responsive.vp(context, 2.2).clamp(16.0, 18.0),
-                      ),
-                      TransactionsFilterTabs(
-                        selectedFilter: controller.selectedFilter.value,
-                        onChanged: controller.changeFilter,
-                      ),
-                      SizedBox(
-                        height: Responsive.vp(context, 3).clamp(20.0, 24.0),
-                      ),
-                      if (!hasVisibleTransactions)
-                        TransactionsEmptyState(
-                          monthLabel: controller.selectedMonthSubtitle,
-                          hasTransactionsLoaded:
-                              controller.transactions.isNotEmpty,
-                        )
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (cardRecurringGroups.isNotEmpty) ...[
-                              TransactionsCardRecurringSection(
-                                groups: cardRecurringGroups,
-                                transactionCount: controller
-                                    .cardRecurringVisibleTransactions
-                                    .length,
-                                isExpanded: isCardRecurringSectionExpanded,
-                                amountFormat: currencyFormat,
-                                compactAmountFormat: compactCurrencyFormat,
-                                onToggleExpanded:
-                                    controller.toggleCardRecurringSection,
-                                onTransactionTap: (transaction) => unawaited(
-                                  _showTransactionActions(context, transaction),
-                                ),
-                              ),
-                              if (normalGroups.isNotEmpty)
-                                SizedBox(
-                                  height: Responsive.vp(
-                                    context,
-                                    2.6,
-                                  ).clamp(18.0, 22.0),
-                                ),
-                            ],
-                            for (
-                              var index = 0;
-                              index < normalGroups.length;
-                              index++
-                            ) ...[
-                              TransactionsDayGroupSection(
-                                group: normalGroups[index],
-                                amountFormat: currencyFormat,
-                                compactAmountFormat: compactCurrencyFormat,
-                                onTransactionTap: (transaction) => unawaited(
-                                  _showTransactionActions(context, transaction),
-                                ),
-                              ),
-                              if (index != normalGroups.length - 1)
-                                SizedBox(
-                                  height: Responsive.vp(
-                                    context,
-                                    2.2,
-                                  ).clamp(16.0, 18.0),
-                                ),
-                            ],
-                          ],
+                      SizedBox(height: verticalGapSmall),
+                      Obx(
+                        () => TransactionsSummaryCards(
+                          incomeAmount: currencyFormat.format(
+                            controller.totalIncomeCents / 100,
+                          ),
+                          expenseAmount: currencyFormat.format(
+                            controller.totalExpenseCents / 100,
+                          ),
                         ),
+                      ),
+                      SizedBox(height: verticalGapMedium),
+                      Obx(
+                        () => TransactionsFilterTabs(
+                          selectedFilter: controller.selectedFilter.value,
+                          onFilterChanged: controller.changeFilter,
+                        ),
+                      ),
+                      SizedBox(height: listTopGap),
+                      Expanded(
+                        child: _TransactionsListViewport(
+                          amountFormat: currencyFormat,
+                          compactAmountFormat: compactCurrencyFormat,
+                          bottomPadding: bottomPadding,
+                          itemSpacing: verticalGapMedium,
+                          onTransactionTap: (transaction) => unawaited(
+                            _showTransactionActions(context, transaction),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -310,6 +266,61 @@ class TransactionsView extends GetView<TransactionsController> {
         ],
       ),
     );
+  }
+}
+
+class _TransactionsListViewport extends GetView<TransactionsController> {
+  const _TransactionsListViewport({
+    required this.amountFormat,
+    required this.compactAmountFormat,
+    required this.bottomPadding,
+    required this.itemSpacing,
+    required this.onTransactionTap,
+  });
+
+  final NumberFormat amountFormat;
+  final NumberFormat compactAmountFormat;
+  final double bottomPadding;
+  final double itemSpacing;
+  final ValueChanged<TransactionEntity> onTransactionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final visibleGroups = controller.groupedVisibleTransactions;
+      final hasVisibleTransactions = visibleGroups.isNotEmpty;
+      final selectedFilter = controller.selectedFilter.value;
+
+      return SingleChildScrollView(
+        key: ValueKey(selectedFilter),
+        physics: const ClampingScrollPhysics(),
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: !hasVisibleTransactions
+            ? TransactionsEmptyState(
+                monthLabel: controller.selectedMonthSubtitle,
+                hasTransactionsLoaded: controller.transactions.isNotEmpty,
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (
+                    var index = 0;
+                    index < visibleGroups.length;
+                    index++
+                  ) ...[
+                    TransactionsDayGroupSection(
+                      group: visibleGroups[index],
+                      amountFormat: amountFormat,
+                      compactAmountFormat: compactAmountFormat,
+                      onTransactionTap: onTransactionTap,
+                    ),
+                    if (index != visibleGroups.length - 1)
+                      SizedBox(height: itemSpacing),
+                  ],
+                ],
+              ),
+      );
+    });
   }
 }
 

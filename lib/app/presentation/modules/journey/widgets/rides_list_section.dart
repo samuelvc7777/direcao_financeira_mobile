@@ -370,14 +370,20 @@ class RidesListSection extends GetView<JourneyController> {
               );
             }
 
+            final items = _RideListItem.buildFrom(state.visibleRides);
             return SliverList.builder(
-              itemCount: state.visibleRides.length + 1,
+              itemCount: items.length + 1,
               itemBuilder: (context, index) {
-                if (index == state.visibleRides.length) {
+                if (index == items.length) {
                   return _RidePaginationFooter(controller: controller);
                 }
 
-                final ride = state.visibleRides[index];
+                final item = items[index];
+                if (item.isHeader) {
+                  return _RideDateHeader(date: item.dateLabel!);
+                }
+
+                final ride = item.ride!;
                 return _RideHistoryCard(
                   ride: ride,
                   onTap: () => _showRideActions(context, ride),
@@ -529,7 +535,167 @@ class _RidesEmptyState extends StatelessWidget {
   }
 }
 
+class _RideListItem {
+  const _RideListItem._({this.dateLabel, this.ride});
+
+  const _RideListItem.header(String dateLabel) : this._(dateLabel: dateLabel);
+
+  const _RideListItem.ride(RideEntity ride) : this._(ride: ride);
+
+  final String? dateLabel;
+  final RideEntity? ride;
+
+  bool get isHeader => dateLabel != null;
+
+  static List<_RideListItem> buildFrom(List<RideEntity> rides) {
+    final items = <_RideListItem>[];
+    final groupsByDate = <String, _RideDateGroup>{};
+
+    for (final ride in rides) {
+      final dateLabel = _normalizedRideDate(ride);
+      groupsByDate
+          .putIfAbsent(dateLabel, () => _RideDateGroup(dateLabel))
+          .add(ride);
+    }
+
+    final groups = groupsByDate.values.toList()
+      ..sort((a, b) => b.sortDate.compareTo(a.sortDate));
+
+    for (final group in groups) {
+      items.add(_RideListItem.header(group.dateLabel));
+      items.addAll(group.rides.map(_RideListItem.ride));
+    }
+
+    return items;
+  }
+
+  static String _normalizedRideDate(RideEntity ride) {
+    final rawDate = ride.date.trim();
+    if (rawDate.isNotEmpty) {
+      return rawDate;
+    }
+
+    final createdAt = ride.createdAt?.toLocal();
+    if (createdAt == null) {
+      return 'Sem data';
+    }
+
+    return '${createdAt.day.toString().padLeft(2, '0')}/'
+        '${createdAt.month.toString().padLeft(2, '0')}/'
+        '${createdAt.year}';
+  }
+}
+
+class _RideDateGroup {
+  _RideDateGroup(this.dateLabel);
+
+  final String dateLabel;
+  final rides = <RideEntity>[];
+  DateTime sortDate = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void add(RideEntity ride) {
+    rides.add(ride);
+    final candidate = ride.createdAt?.toLocal() ?? _parseDateLabel(dateLabel);
+    if (candidate != null && candidate.isAfter(sortDate)) {
+      sortDate = candidate;
+    }
+  }
+
+  static DateTime? _parseDateLabel(String dateLabel) {
+    final parts = dateLabel.split('/');
+    if (parts.length < 2) {
+      return null;
+    }
+
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = parts.length >= 3
+        ? int.tryParse(parts[2])
+        : DateTime.now().year;
+
+    if (day == null || month == null || year == null) {
+      return null;
+    }
+
+    return DateTime(year, month, day);
+  }
+}
+
+class _RideDateHeader extends StatelessWidget {
+  const _RideDateHeader({required this.date});
+
+  final String date;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        Responsive.hp(context, 4.0).clamp(12.0, 20.0),
+        Responsive.vp(context, 1.2).clamp(8.0, 12.0),
+        Responsive.hp(context, 4.0).clamp(12.0, 20.0),
+        Responsive.vp(context, 0.2).clamp(2.0, 4.0),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.hp(context, 3.0).clamp(10.0, 14.0),
+              vertical: Responsive.vp(context, 0.7).clamp(5.0, 8.0),
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.royalBlue.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: AppColors.royalBlue.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: Responsive.sp(context, 14).clamp(12.0, 16.0),
+                  color: AppColors.royalBlue,
+                ),
+                SizedBox(width: Responsive.hp(context, 1.4).clamp(5.0, 8.0)),
+                Text(
+                  date,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: Responsive.sp(context, 12).clamp(11.0, 14.0),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: Responsive.hp(context, 2.0).clamp(8.0, 12.0)),
+          Expanded(
+            child: Divider(
+              color: colorScheme.onSurface.withValues(alpha: 0.10),
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 enum _RideAction { details, delete }
+
+String _rideDateTimeLabel(RideEntity ride) {
+  final date = _RideListItem._normalizedRideDate(ride);
+  final time = ride.time.trim();
+
+  if (time.isEmpty) {
+    return date;
+  }
+
+  return '$date às $time';
+}
 
 class _RideActionsSheet extends StatelessWidget {
   const _RideActionsSheet({required this.ride, required this.formatCurrency});
@@ -586,7 +752,7 @@ class _RideActionsSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${ride.date} ${ride.time} - ${formatCurrency(ride.grossValueCents)}',
+                          '${_rideDateTimeLabel(ride)} - ${formatCurrency(ride.grossValueCents)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -845,7 +1011,7 @@ class _RideHistoryCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              '${ride.date} às ${ride.time}',
+                              _rideDateTimeLabel(ride),
                               style: TextStyle(
                                 color: colorScheme.onSurface.withValues(
                                   alpha: 0.54,

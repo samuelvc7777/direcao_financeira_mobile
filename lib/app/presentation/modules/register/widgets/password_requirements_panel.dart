@@ -8,65 +8,96 @@ class PasswordRequirementsPanel extends GetView<RegisterController> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(
-      () => Column(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F2A24) : const Color(0xFFEAF8F0),
+        borderRadius: BorderRadius.circular(18),
+        border: isDark ? Border.all(color: const Color(0xFF1F4D42)) : null,
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildRequirementItem(
-            context,
-            'Mínimo 8 caracteres',
-            controller.hasMinLength.value,
+          Text(
+            'Requisitos da senha',
+            style: TextStyle(
+              color: isDark ? const Color(0xFFD1FAE5) : const Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          _buildRequirementItem(
-            context,
-            'Uma letra maiúscula',
-            controller.hasUppercase.value,
-          ),
-          _buildRequirementItem(
-            context,
-            'Uma letra minúscula',
-            controller.hasLowercase.value,
-          ),
-          _buildRequirementItem(
-            context,
-            'Um símbolo especial (@, #, \$...)',
-            controller.hasSpecial.value,
-          ),
-          _buildRequirementItem(
-            context,
-            'As senhas são idênticas',
-            controller.passwordsMatch.value,
+          const SizedBox(height: 10),
+          Obx(
+            () => Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _RequirementChip(
+                  label: '8 caracteres',
+                  isMet: controller.hasMinLength.value,
+                ),
+                _RequirementChip(
+                  label: '1 maiúscula',
+                  isMet: controller.hasUppercase.value,
+                ),
+                _RequirementChip(
+                  label: '1 minúscula',
+                  isMet: controller.hasLowercase.value,
+                ),
+                _RequirementChip(
+                  label: '1 símbolo',
+                  isMet: controller.hasSpecial.value,
+                ),
+                _RequirementChip(
+                  label: 'senhas idênticas',
+                  isMet: controller.passwordsMatch.value,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRequirementItem(BuildContext context, String text, bool isMet) {
-    final colorScheme = Theme.of(context).colorScheme;
+class _RequirementChip extends StatelessWidget {
+  const _RequirementChip({required this.label, required this.isMet});
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+  final String label;
+  final bool isMet;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = const Color(0xFF10B981);
+
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF162B27) : Colors.white,
+        borderRadius: BorderRadius.circular(15),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             isMet
-                ? Icons.check_circle_rounded
+                ? Icons.check_circle_outline_rounded
                 : Icons.radio_button_unchecked_rounded,
-            size: 16,
-            color: isMet
-                ? colorScheme.primary
-                : colorScheme.onSurface.withValues(alpha: 0.28),
+            size: 15,
+            color: isMet ? activeColor : const Color(0xFF94A3B8),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
           Text(
-            text,
+            label,
             style: TextStyle(
-              fontSize: 12,
-              color: isMet
-                  ? colorScheme.onSurface
-                  : colorScheme.onSurface.withValues(alpha: 0.58),
-              fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+              color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF64748B),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

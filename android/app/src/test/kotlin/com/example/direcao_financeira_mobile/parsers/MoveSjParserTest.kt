@@ -366,6 +366,39 @@ class MoveSjParserTest {
     }
 
     @Test
+    fun `ocr posicional da movesj usa somente nome ancorado acima da avaliacao`() {
+        val ocrLines =
+            listOf(
+                MoveSjParser.OcrLine("Move", 49, 62, 174, 122),
+                MoveSjParser.OcrLine("RECUSAR", 168, 219, 343, 255),
+                MoveSjParser.OcrLine("PONTE", 78, 442, 190, 474),
+                MoveSjParser.OcrLine("Santa Cruz", 58, 492, 220, 526),
+                MoveSjParser.OcrLine("Samuel", 146, 566, 291, 600),
+                MoveSjParser.OcrLine("5,00★", 178, 631, 295, 664),
+                MoveSjParser.OcrLine("R$ 12,66", 423, 408, 709, 480),
+                MoveSjParser.OcrLine("(Motorista)", 787, 388, 998, 423),
+                MoveSjParser.OcrLine("R$ 12,66", 772, 453, 1009, 501),
+                MoveSjParser.OcrLine("1,5 km (R$ 8,61/km)", 421, 535, 866, 574),
+                MoveSjParser.OcrLine("4 min (R$ 2,98/min)", 421, 603, 867, 641),
+                MoveSjParser.OcrLine("0 m (1 min)", 85, 731, 297, 765),
+                MoveSjParser.OcrLine("R. Joaquim Portugal, 15 - Matozinhos, Sao", 37, 794, 1011, 832),
+                MoveSjParser.OcrLine("Joao del Rei - MG, 36305-174, Brasil", 37, 855, 818, 892),
+                MoveSjParser.OcrLine("1,5 km (4 min)", 85, 942, 353, 978),
+                MoveSjParser.OcrLine("Av. Leite de Castro, 617 - Fabricas, Sao Joao", 37, 1004, 1040, 1041),
+                MoveSjParser.OcrLine("del Rei - MG, 36301-182, Brasil", 37, 1065, 697, 1102),
+                MoveSjParser.OcrLine("ACEITAR (12)", 363, 1256, 594, 1290),
+            ).shuffled()
+
+        val offerData =
+            parser.parsePositionedOcrOffer(
+                rawText = ocrLines.joinToString("\n") { it.text },
+                ocrLines = ocrLines,
+            )!!
+
+        assertEquals("Samuel", offerData["passenger_name"])
+    }
+
+    @Test
     fun `ocr da movesj preserva destino longo quebrado em quatro linhas`() {
         val lines =
             listOf(
@@ -401,6 +434,172 @@ class MoveSjParserTest {
             "Independente Esporte Clube - Avenida Domingos Pinto Camarano - Colonia do Marcal, Sao Joao del Rei - MG, CEP 36302004, Brasil",
             offerData["destination_address"],
         )
+    }
+
+    @Test
+    fun `ocr posicional da movesj preserva destino longo quando trecho verde quebra distancia e tempo`() {
+        val ocrLines =
+            listOf(
+                MoveSjParser.OcrLine("Move", 28, 491, 96, 518),
+                MoveSjParser.OcrLine("Deslize para recusar", 213, 542, 422, 585),
+                MoveSjParser.OcrLine("Samuel", 82, 750, 160, 782),
+                MoveSjParser.OcrLine("5,00★", 96, 790, 163, 817),
+                MoveSjParser.OcrLine("R$ 13,40", 231, 670, 409, 724),
+                MoveSjParser.OcrLine("(Motorista)", 432, 656, 548, 688),
+                MoveSjParser.OcrLine("R$ 13,40", 424, 699, 552, 730),
+                MoveSjParser.OcrLine("1,7 km (R$ 7,92/km)", 230, 734, 435, 766),
+                MoveSjParser.OcrLine("5 min (R$ 2,67/min)", 231, 775, 462, 806),
+                MoveSjParser.OcrLine("2 m", 21, 842, 70, 872),
+                MoveSjParser.OcrLine("(1 min)", 77, 842, 184, 872),
+                MoveSjParser.OcrLine("R. Getulio Vargas, 989 - A Definir, Santa Cruz", 21, 877, 570, 912),
+                MoveSjParser.OcrLine("de Minas - MG, 36302-142, Brasil", 21, 917, 407, 952),
+                MoveSjParser.OcrLine("1,7 km", 21, 962, 100, 992),
+                MoveSjParser.OcrLine("(5 min)", 105, 962, 184, 992),
+                MoveSjParser.OcrLine("Independente Esporte Clube - Avenida", 21, 993, 466, 1030),
+                MoveSjParser.OcrLine("Domingos Pinto Camarano - Colonia", 21, 1034, 551, 1070),
+                MoveSjParser.OcrLine("do Marcal, Sao Joao del Rei - MG, CEP", 21, 1075, 570, 1110),
+                MoveSjParser.OcrLine("36302004, Brasil", 21, 1114, 220, 1148),
+                MoveSjParser.OcrLine("Deslize para aceitar (4)", 211, 1184, 432, 1236),
+            ).shuffled()
+
+        val offerData =
+            parser.parsePositionedOcrOffer(
+                rawText = ocrLines.joinToString("\n") { it.text },
+                ocrLines = ocrLines,
+            )!!
+
+        assertEquals("Samuel", offerData["passenger_name"])
+        assertEquals("R$ 13,40", offerData["valor_bruto"])
+        assertEquals(
+            "R. Getulio Vargas, 989 - A Definir, Santa Cruz de Minas - MG, 36302-142, Brasil",
+            offerData["origin_address"],
+        )
+        assertEquals(
+            "Independente Esporte Clube - Avenida Domingos Pinto Camarano - Colonia do Marcal, Sao Joao del Rei - MG, CEP 36302004, Brasil",
+            offerData["destination_address"],
+        )
+    }
+
+    @Test
+    fun `ocr posicional da movesj recupera passageiro quando nome vem grudado com metrica`() {
+        val ocrLines =
+            listOf(
+                MoveSjParser.OcrLine("Move", 64, 903, 161, 933),
+                MoveSjParser.OcrLine("Deslize para recusar", 392, 1036, 819, 1080),
+                MoveSjParser.OcrLine("(Motorista)", 788, 1194, 991, 1236),
+                MoveSjParser.OcrLine("R$ 13,40 RŠ 13,40", 443, 1215, 1008, 1320),
+                MoveSjParser.OcrLine("R$", 793, 1254, 875, 1315),
+                MoveSjParser.OcrLine("Samuelstb L,7 km (R$ 7,91/km)", 167, 1328, 876, 1412),
+                MoveSjParser.OcrLine("5 min (R$ 2,67/min)", 423, 1403, 866, 1458),
+                MoveSjParser.OcrLine("e3m(1 min)", 65, 1526, 290, 1582),
+                MoveSjParser.OcrLine("R. Getulio Vargas, 989 - A Definir, Santa Cruz", 60, 1595, 1028, 1645),
+                MoveSjParser.OcrLine("de Minas - MG, 36302-142, Brasil", 38, 1658, 777, 1702),
+                MoveSjParser.OcrLine("91,7 km (5 min)", 62, 1738, 346, 1784),
+                MoveSjParser.OcrLine("Independente Esporte Clube - Avenida", 40, 1809, 894, 1857),
+                MoveSjParser.OcrLine("Domingos Pinto Camarano - Colonia", 40, 1866, 850, 1911),
+                MoveSjParser.OcrLine("do Marcal, Sao Joao del Rei - MG, CEP", 38, 1923, 900, 1973),
+                MoveSjParser.OcrLine("36302004, Brasil", 38, 1986, 414, 2031),
+                MoveSjParser.OcrLine("Deslize para aceitar (4)", 388, 2168, 871, 2213),
+            ).shuffled()
+
+        val offerData =
+            parser.parsePositionedOcrOffer(
+                rawText = ocrLines.joinToString("\n") { it.text },
+                ocrLines = ocrLines,
+            )!!
+
+        assertEquals("Samuel", offerData["passenger_name"])
+        assertEquals(1.7, offerData["km_total"])
+        assertEquals(5, offerData["minutos_total"])
+        assertEquals(
+            "Independente Esporte Clube - Avenida Domingos Pinto Camarano - Colonia do Marcal, Sao Joao del Rei - MG, CEP 36302004, Brasil",
+            offerData["destination_address"],
+        )
+    }
+
+    @Test
+    fun `ocr da movesj preserva destino longo quando trecho vem sem parenteses`() {
+        val lines =
+            listOf(
+                "Move",
+                "Deslize para recusar",
+                "Samuel",
+                "5,00★",
+                "R$ 13,40",
+                "(Motorista)",
+                "R$ 13,40",
+                "1,7 km (R$ 7,92/km)",
+                "5 min (R$ 2,67/min)",
+                "2 m 1 min",
+                "R. Getulio Vargas, 989 - A Definir, Santa Cruz",
+                "de Minas - MG, 36302-142, Brasil",
+                "1,7 km 5 min",
+                "Independente Esporte Clube - Avenida",
+                "Domingos Pinto Camarano - Colonia",
+                "do Marcal, Sao Joao del Rei - MG, CEP",
+                "36302004, Brasil",
+                "Deslize para aceitar (4)",
+            )
+
+        val offerData = parser.parseOcrOffer(lines.joinToString("\n"), lines)!!
+
+        assertEquals(
+            "Independente Esporte Clube - Avenida Domingos Pinto Camarano - Colonia do Marcal, Sao Joao del Rei - MG, CEP 36302004, Brasil",
+            offerData["destination_address"],
+        )
+    }
+
+    @Test
+    fun `ocr da movesj aceita destino curto com nome de lugar`() {
+        val lines =
+            listOf(
+                "Move",
+                "Deslize para recusar",
+                "Juliana",
+                "5,00★",
+                "R$ 14,61",
+                "(Motorista)",
+                "R$ 14,61",
+                "5,3 km (R$ 2,76/km)",
+                "13 min (R$ 1,12/min)",
+                "3,1 km (7 min)",
+                "Rua Delegado Jose Lima, 201 - Guarda-Mor",
+                "- Sao Joao del Rei - MG",
+                "2,2 km (5 min)",
+                "Independente",
+                "Deslize para aceitar (4)",
+            )
+
+        val offerData = parser.parseOcrOffer(lines.joinToString("\n"), lines)!!
+
+        assertEquals("Rua Delegado Jose Lima, 201 - Guarda-Mor - Sao Joao del Rei - MG", offerData["origin_address"])
+        assertEquals("Independente", offerData["destination_address"])
+    }
+
+    @Test
+    fun `ocr da movesj aceita destino bahamas como nome de lugar`() {
+        val lines =
+            listOf(
+                "Move",
+                "Deslize para recusar",
+                "Juliana",
+                "5,00★",
+                "R$ 14,61",
+                "(Motorista)",
+                "R$ 14,61",
+                "5,3 km (R$ 2,76/km)",
+                "13 min (R$ 1,12/min)",
+                "3,1 km (7 min)",
+                "Rua Delegado Jose Lima, 201 - Guarda-Mor",
+                "- Sao Joao del Rei - MG",
+                "2,2 km (5 min)",
+                "Bahamas",
+                "Deslize para aceitar (4)",
+            )
+
+        val offerData = parser.parseOcrOffer(lines.joinToString("\n"), lines)!!
+
+        assertEquals("Bahamas", offerData["destination_address"])
     }
 
     @Test
@@ -485,6 +684,41 @@ class MoveSjParserTest {
         assertEquals("R$ 19,80", offerData["valor_bruto"])
         assertEquals(3.4, offerData["km_total"])
         assertEquals(9, offerData["minutos_total"])
+    }
+
+    @Test
+    fun `ocr posicional da movesj usa valor bruto mesmo quando ocr troca R cifrao por RS`() {
+        val ocrLines =
+            listOf(
+                MoveSjParser.OcrLine("Move", 28, 491, 96, 518),
+                MoveSjParser.OcrLine("Deslize para recusar", 213, 542, 422, 585),
+                MoveSjParser.OcrLine("Juliana", 82, 750, 160, 782),
+                MoveSjParser.OcrLine("5,00★", 96, 790, 163, 817),
+                MoveSjParser.OcrLine("RS 14,61", 231, 670, 409, 724),
+                MoveSjParser.OcrLine("(Motorista)", 432, 656, 548, 688),
+                MoveSjParser.OcrLine("R$ 14,61", 424, 699, 552, 730),
+                MoveSjParser.OcrLine("5,3 km (R$ 2,76/km)", 230, 734, 435, 766),
+                MoveSjParser.OcrLine("13 min (R$ 1,12/min)", 231, 775, 462, 806),
+                MoveSjParser.OcrLine("3,1 km (7 min)", 21, 842, 184, 872),
+                MoveSjParser.OcrLine("Rua Delegado Jose Lima, 201 - Guarda-Mor", 21, 877, 570, 912),
+                MoveSjParser.OcrLine("- Sao Joao del Rei - MG", 21, 917, 307, 952),
+                MoveSjParser.OcrLine("2,2 km (5 min)", 21, 962, 184, 992),
+                MoveSjParser.OcrLine("APAC - Associacao de Protecao e", 21, 993, 466, 1030),
+                MoveSjParser.OcrLine("Assistencia aos Condenados de Sao Joao", 21, 1034, 551, 1070),
+                MoveSjParser.OcrLine("del-Rei - Jardim Sao Jose, Sao Joao del Rei -", 21, 1075, 570, 1110),
+                MoveSjParser.OcrLine("MG", 21, 1114, 59, 1148),
+                MoveSjParser.OcrLine("Deslize para aceitar (4)", 211, 1184, 432, 1236),
+            ).shuffled()
+
+        val offerData =
+            parser.parsePositionedOcrOffer(
+                rawText = ocrLines.joinToString("\n") { it.text },
+                ocrLines = ocrLines,
+            )!!
+
+        assertEquals("R$ 14,61", offerData["valor_bruto"])
+        assertEquals(5.3, offerData["km_total"])
+        assertEquals(13, offerData["minutos_total"])
     }
 
     @Test

@@ -24,7 +24,7 @@ class ImportRidePhotoView extends GetView<ImportRidePhotoController> {
       backgroundColor: context.theme.scaffoldBackgroundColor,
       appBar: const CustomAppBar(
         title: 'Importar print',
-        subtitle: 'Historico MoveSJ e Me Leva SJ',
+        subtitle: 'Uber, 99, MoveSJ e Me Leva SJ',
         leadingIcon: Icons.photo_camera_back_rounded,
       ),
       body: SafeArea(
@@ -77,7 +77,7 @@ class ImportRidePhotoView extends GetView<ImportRidePhotoController> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Leitura automatica de MoveSJ e Me Leva SJ com rota calculada pelo Google Maps',
+                                    'Leitura automatica de Uber, 99, MoveSJ e Me Leva SJ com rota calculada pelo Google Maps',
                                     style: TextStyle(
                                       color: colorScheme.onSurfaceVariant,
                                       fontSize: Responsive.sp(

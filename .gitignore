@@ -74,3 +74,13 @@ supabase/.temp/
 .specify/extensions/.cache/
 .specify/extensions/.backup/
 .specify/extensions/*/local-config.yml
+
+# Codex/local tooling artifacts
+.codex-remote-attachments/
+android/.flutter-tools-gradle-codex/
+android/.gradle-codex-home/
+android/.gradle-codex-project-cache/
+android/.kotlin-parser-check/
+android/flutter-tools-gradle-codex/
+*.pen
+*.pen.txt

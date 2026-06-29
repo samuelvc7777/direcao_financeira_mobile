@@ -1,4 +1,4 @@
-package com.example.direcao_financeira_mobile
+﻿package com.example.direcao_financeira_mobile
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -37,6 +38,7 @@ class FloatingOverlay(
     private val metricBarViews = mutableListOf<View>()
     private val metricLabelViews = mutableListOf<TextView>()
     private var badgeTextView: TextView? = null
+    private var signalTextView: TextView? = null
     private var summaryTextView: TextView? = null
 
     fun show(data: Map<String, Any>) {
@@ -77,6 +79,7 @@ class FloatingOverlay(
         metricBarViews.clear()
         metricLabelViews.clear()
         badgeTextView = null
+        signalTextView = null
         summaryTextView = null
     }
 
@@ -86,17 +89,22 @@ class FloatingOverlay(
         val wm = windowManager ?: return
         val screenWidth = context.resources.displayMetrics.widthPixels
         val screenHeight = context.resources.displayMetrics.heightPixels
-        val horizontalMargin = dpToPx(16f)
         val sidePosition = SettingsManager.position == 1 || SettingsManager.position == 2
+        val horizontalMargin = if (sidePosition) 0 else dpToPx(16f)
         val cardWidth =
             (screenWidth - (horizontalMargin * 2))
-                .coerceAtMost(if (sidePosition) dpToPx(280f) else dpToPx(380f))
+                .coerceAtMost(if (sidePosition) dpToPx(104f) else dpToPx(356f))
 
         val container = FrameLayout(context)
         val card =
             LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dpToPx(18f), dpToPx(18f), dpToPx(18f), dpToPx(18f))
+                setPadding(
+                    dpToPx(if (sidePosition) 12f else 18f),
+                    dpToPx(if (sidePosition) 12f else 16f),
+                    dpToPx(if (sidePosition) 12f else 18f),
+                    dpToPx(if (sidePosition) 12f else 16f),
+                )
                 layoutParams =
                     FrameLayout.LayoutParams(
                         cardWidth,
@@ -124,17 +132,19 @@ class FloatingOverlay(
             }
         metricsRow = row
 
-        enabledIndicators().forEach { indicator ->
+        val activeIndicators = enabledIndicators()
+        activeIndicators.forEachIndexed { index, indicator ->
             val metricColumn =
                 LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
+                    orientation = if (sidePosition) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+                    gravity = if (sidePosition) Gravity.CENTER_VERTICAL else Gravity.START
                     layoutParams =
                         if (sidePosition) {
                             LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT,
                                 LinearLayout.LayoutParams.WRAP_CONTENT,
                             ).apply {
-                                bottomMargin = dpToPx(12f)
+                                bottomMargin = dpToPx(if (index < activeIndicators.lastIndex) 8f else 0f)
                             }
                         } else {
                             LinearLayout.LayoutParams(
@@ -145,15 +155,6 @@ class FloatingOverlay(
                         }
                 }
 
-            val labelView =
-                TextView(context).apply {
-                    text = indicator.overlayLabel
-                    typeface = Typeface.DEFAULT_BOLD
-                }
-            metricLabelViews.add(labelView)
-            metricColumn.addView(labelView)
-            metricColumn.addView(spacer(10f))
-
             val valueRow =
                 LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -162,26 +163,55 @@ class FloatingOverlay(
 
             val accentBar =
                 View(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(dpToPx(6f), dpToPx(34f))
+                    layoutParams =
+                        LinearLayout.LayoutParams(
+                            dpToPx(if (sidePosition) 4f else 4f),
+                            dpToPx(if (sidePosition) 22f else 22f),
+                        )
                 }
             metricBarViews.add(accentBar)
             valueRow.addView(accentBar)
+
+            val textColumn =
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams =
+                        LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f,
+                        ).apply {
+                            leftMargin = dpToPx(4f)
+                        }
+                }
+
+            val labelView =
+                TextView(context).apply {
+                    text = indicator.overlayLabel
+                    typeface = Typeface.DEFAULT_BOLD
+                    includeFontPadding = false
+                    setSingleLine(true)
+                }
+            metricLabelViews.add(labelView)
+            textColumn.addView(labelView)
 
             val valueView =
                 TextView(context).apply {
                     text = "--"
                     typeface = Typeface.DEFAULT_BOLD
-                    setPadding(dpToPx(10f), 0, 0, 0)
+                    includeFontPadding = false
+                    setSingleLine(true)
                 }
             metricValueViews.add(valueView)
-            valueRow.addView(valueView)
+            textColumn.addView(valueView)
+            valueRow.addView(textColumn)
 
             metricColumn.addView(valueRow)
             row.addView(metricColumn)
         }
 
         card.addView(row)
-        card.addView(spacer(18f))
+        card.addView(spacer(if (sidePosition) 8f else 11f))
 
         val footerRow =
             LinearLayout(context).apply {
@@ -193,17 +223,49 @@ class FloatingOverlay(
             TextView(context).apply {
                 text = "APP"
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(dpToPx(8f), dpToPx(4f), dpToPx(8f), dpToPx(4f))
+                includeFontPadding = false
+                setSingleLine(true)
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(dpToPx(6f), dpToPx(3f), dpToPx(6f), dpToPx(3f))
             }
         footerRow.addView(badgeTextView)
 
         summaryTextView =
             TextView(context).apply {
-                text = "0h00m · 0.0km"
+                text = if (sidePosition) "0h00m\n0.0km" else "0h00m · 0.0km"
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(dpToPx(12f), 0, 0, 0)
-            }
+                includeFontPadding = false
+                setSingleLine(!sidePosition)
+                maxLines = if (sidePosition) 2 else 1
+                ellipsize = TextUtils.TruncateAt.END
+                layoutParams =
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    )
+                setPadding(dpToPx(5f), 0, 0, 0)
+        }
         footerRow.addView(summaryTextView)
+
+        if (!sidePosition) {
+            signalTextView =
+                TextView(context).apply {
+                    text = "bom"
+                    typeface = Typeface.DEFAULT_BOLD
+                    includeFontPadding = false
+                    setSingleLine(true)
+                    ellipsize = TextUtils.TruncateAt.END
+                    layoutParams =
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                        ).apply {
+                            leftMargin = dpToPx(8f)
+                        }
+                    setPadding(dpToPx(7f), dpToPx(4f), dpToPx(7f), dpToPx(4f))
+                }
+            footerRow.addView(signalTextView)
+        }
 
         card.addView(footerRow)
         container.addView(card)
@@ -278,8 +340,14 @@ class FloatingOverlay(
                 ?: data["app"]?.toString()?.takeIf { it.isNotBlank() }
                 ?: "APP"
         badgeTextView?.text = appName.uppercase()
+        signalTextView?.text = signalStatus.overlayLabel
+        val sidePosition = SettingsManager.position == 1 || SettingsManager.position == 2
         summaryTextView?.text =
-            "${formatDuration(metrics.totalMinutes)} · ${String.format("%.1f", metrics.totalKm)}km"
+            if (sidePosition) {
+                "${formatDuration(metrics.totalMinutes)}\n${String.format("%.1f", metrics.totalKm)}km"
+            } else {
+                "${formatDuration(metrics.totalMinutes)} · ${String.format("%.1f", metrics.totalKm)}km"
+            }
 
         overlayView?.let { view ->
             currentLayoutParams?.let { params ->
@@ -293,15 +361,29 @@ class FloatingOverlay(
 
     private fun applyVisualStyle(signalColor: Int) {
         val theme = resolveThemePalette()
-        val labelSize = (SettingsManager.fontSize - 2f).coerceAtLeast(10f)
-        val valueSize = (SettingsManager.fontSize + 8f).coerceAtLeast(18f)
-        val footerSize = (SettingsManager.fontSize + 2f).coerceAtLeast(12f)
+        val sidePosition = SettingsManager.position == 1 || SettingsManager.position == 2
+        val labelSize =
+            if (sidePosition) 9f else (SettingsManager.fontSize * 0.42f).coerceIn(9f, 11f)
+        val valueSize =
+            if (sidePosition) 18f else (SettingsManager.fontSize * 0.9f).coerceIn(18f, 22f)
+        val footerSize =
+            if (sidePosition) 10f else (SettingsManager.fontSize * 0.55f).coerceIn(11f, 13f)
 
         cardView?.background =
             GradientDrawable().apply {
                 setColor(theme.backgroundColor)
-                cornerRadius = dpToPx(22f).toFloat()
-                setStroke(dpToPx(6f), signalColor)
+                if (sidePosition) {
+                    val radius = dpToPx(18f).toFloat()
+                    cornerRadii =
+                        if (SettingsManager.position == 1) {
+                            floatArrayOf(0f, 0f, radius, radius, radius, radius, 0f, 0f)
+                        } else {
+                            floatArrayOf(radius, radius, 0f, 0f, 0f, 0f, radius, radius)
+                        }
+                } else {
+                    cornerRadius = dpToPx(20f).toFloat()
+                }
+                setStroke(dpToPx(if (sidePosition) 5f else 6f), signalColor)
             }
         cardView?.alpha = SettingsManager.opacity / 100f
 
@@ -318,18 +400,28 @@ class FloatingOverlay(
         metricBarViews.forEach { bar ->
             bar.background =
                 GradientDrawable().apply {
-                    cornerRadius = dpToPx(8f).toFloat()
+                    cornerRadius = dpToPx(if (sidePosition) 5f else 5f).toFloat()
                     setColor(signalColor)
                 }
         }
 
         badgeTextView?.apply {
             setTextColor(theme.badgeTextColor)
-            textSize = (SettingsManager.fontSize - 5f).coerceAtLeast(9f)
+            textSize = if (sidePosition) 10f else (SettingsManager.fontSize * 0.45f).coerceIn(9f, 10f)
             background =
                 GradientDrawable().apply {
-                    cornerRadius = dpToPx(6f).toFloat()
+                    cornerRadius = dpToPx(5f).toFloat()
                     setColor(theme.badgeBackgroundColor)
+                }
+        }
+
+        signalTextView?.apply {
+            setTextColor(Color.WHITE)
+            textSize = 10f
+            background =
+                GradientDrawable().apply {
+                    cornerRadius = dpToPx(5f).toFloat()
+                    setColor(signalColor)
                 }
         }
 
@@ -347,6 +439,7 @@ class FloatingOverlay(
                 .toDoubleOrNull() ?: 0.0
         val totalKm = (data["km_total"] as? Number)?.toDouble() ?: 0.0
         val totalMinutes = (data["minutos_total"] as? Number)?.toInt() ?: 0
+        val displayedGainPerKm = (data["ganho_km"] as? Number)?.toDouble()
         val fuelCostValue = calculateFuelCostValue(totalKm)
         val rating =
             data["avaliacao"]?.toString()
@@ -359,7 +452,7 @@ class FloatingOverlay(
             totalKm = totalKm,
             totalMinutes = totalMinutes,
             rating = rating,
-            gainPerKm = if (totalKm > 0) grossValue / totalKm else 0.0,
+            gainPerKm = displayedGainPerKm ?: if (totalKm > 0) grossValue / totalKm else 0.0,
             gainPerHour = if (totalMinutes > 0) (grossValue / totalMinutes) * 60 else 0.0,
             profitValue = grossValue - fuelCostValue,
         )
@@ -485,10 +578,10 @@ class FloatingOverlay(
                 )
             2 ->
                 OverlayThemePalette(
-                    backgroundColor = Color.parseColor("#EAF8F0"),
-                    primaryTextColor = Color.parseColor("#0B2F1D"),
-                    labelColor = Color.parseColor("#3D6B57"),
-                    badgeBackgroundColor = Color.parseColor("#0B2F1D"),
+                    backgroundColor = Color.parseColor("#A7EFC0"),
+                    primaryTextColor = Color.BLACK,
+                    labelColor = Color.BLACK,
+                    badgeBackgroundColor = Color.BLACK,
                     badgeTextColor = Color.WHITE,
                 )
             else ->
@@ -583,14 +676,15 @@ class FloatingOverlay(
             return customX to customY
         }
 
+        val edgeMargin = if (SettingsManager.position == 1 || SettingsManager.position == 2) 0 else margin
         val topY = dpToPx(40f)
         val centeredX = ((screenWidth - overlayWidth) / 2).coerceAtLeast(0)
         val centeredY = ((screenHeight - overlayHeight) / 2).coerceAtLeast(0)
-        val rightX = (screenWidth - overlayWidth - margin).coerceAtLeast(0)
+        val rightX = (screenWidth - overlayWidth - edgeMargin).coerceAtLeast(0)
         val bottomY = (screenHeight - overlayHeight - dpToPx(40f)).coerceAtLeast(0)
 
         return when (SettingsManager.position) {
-            1 -> margin to centeredY
+            1 -> edgeMargin to centeredY
             2 -> rightX to centeredY
             3 -> centeredX to bottomY
             else -> centeredX to topY
@@ -648,10 +742,10 @@ class FloatingOverlay(
         val badgeTextColor: Int,
     )
 
-    private enum class OverlaySignalStatus {
-        GOOD,
-        MEDIUM,
-        BAD,
+    private enum class OverlaySignalStatus(val overlayLabel: String) {
+        GOOD("bom"),
+        MEDIUM("medio"),
+        BAD("ruim"),
     }
 
     private enum class OverlayIndicator(val overlayLabel: String) {

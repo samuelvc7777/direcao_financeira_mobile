@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/maps/map_address_launcher_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/ride_entity.dart';
 import '../../../domain/usecases/ride_status_use_cases.dart';
@@ -188,6 +189,7 @@ class _RideDetailsBody extends StatefulWidget {
 
 class _RideDetailsBodyState extends State<_RideDetailsBody>
     with SingleTickerProviderStateMixin {
+  final _mapLauncher = const MapAddressLauncherService();
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
@@ -243,7 +245,16 @@ class _RideDetailsBodyState extends State<_RideDetailsBody>
                     isDark: isDark,
                   ),
                   const SizedBox(height: 6),
-                  RideRouteCard(ride: ride, isDark: isDark),
+                  RideRouteCard(
+                    ride: ride,
+                    isDark: isDark,
+                    onOpenOrigin: _canOpenAddress(ride.origin)
+                        ? () => _openAddress(ride.origin, 'origem')
+                        : null,
+                    onOpenDestination: _canOpenAddress(ride.destination)
+                        ? () => _openAddress(ride.destination, 'destino')
+                        : null,
+                  ),
                   const SizedBox(height: 16),
 
                   RideSectionLabel(
@@ -268,6 +279,28 @@ class _RideDetailsBodyState extends State<_RideDetailsBody>
           ),
         ),
       ),
+    );
+  }
+
+  bool _canOpenAddress(String address) {
+    final normalized = address.trim().toLowerCase();
+    return normalized.isNotEmpty &&
+        normalized != 'origem nao informada' &&
+        normalized != 'destino nao informado' &&
+        normalized != 'origem não informada' &&
+        normalized != 'destino não informado';
+  }
+
+  Future<void> _openAddress(String address, String label) async {
+    final opened = await _mapLauncher.openAddress(address);
+    if (!mounted || opened) {
+      return;
+    }
+
+    Get.snackbar(
+      'Nao foi possivel abrir',
+      'Confira o endereco de $label da corrida.',
+      snackPosition: SnackPosition.BOTTOM,
     );
   }
 }

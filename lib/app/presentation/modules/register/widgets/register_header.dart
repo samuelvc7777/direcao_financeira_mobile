@@ -1,39 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:direcao_financeira_mobile/app/core/theme/app_colors.dart';
 
 class RegisterHeader extends StatelessWidget {
   const RegisterHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.theme.colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: colorScheme.onSurface),
-            onPressed: () => Get.back(),
+        Center(
+          child: Image.asset(
+            'assets/images/logo_direcao_financeira2.png.png',
+            width: 128,
+            height: 115,
+            fit: BoxFit.contain,
           ),
         ),
-        const Icon(Icons.person_add_rounded, size: 80, color: AppColors.teal),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Text(
-          'Criar Conta',
-          textAlign: TextAlign.center,
+          'Criar conta',
           style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            letterSpacing: 1.2,
+            fontSize: 29,
+            fontWeight: FontWeight.w800,
+            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
           ),
         ),
+        const SizedBox(height: 12),
         Text(
-          'Junte-se à elite dos motoristas',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+          'Junte-se à elite dos motoristas e acompanhe ganhos, custos e metas com precisão.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.35,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
         ),
       ],
     );

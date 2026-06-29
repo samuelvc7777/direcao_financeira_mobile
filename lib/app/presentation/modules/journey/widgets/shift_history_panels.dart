@@ -132,11 +132,7 @@ class ShiftStartPanel extends StatelessWidget {
             ),
           ),
           SizedBox(height: Responsive.vp(context, 1.0).clamp(6.0, 10.0)),
-          ShiftQuickToggleButton.trafficLight(controller: controller),
-          SizedBox(height: Responsive.vp(context, 0.2).clamp(2.0, 6.0)),
-          ShiftQuickToggleButton.assistant(controller: controller),
-          SizedBox(height: Responsive.vp(context, 0.2).clamp(2.0, 6.0)),
-          ShiftQuickToggleButton.recording(controller: controller),
+          _ShiftQuickControlsPanel(controller: controller),
         ],
       ),
     );
@@ -270,11 +266,7 @@ class ShiftActivePanel extends StatelessWidget {
           ],
         ),
         SizedBox(height: Responsive.vp(context, 1.2).clamp(8.0, 14.0)),
-        ShiftQuickToggleButton.trafficLight(controller: controller),
-        SizedBox(height: Responsive.vp(context, 0.2).clamp(2.0, 6.0)),
-        ShiftQuickToggleButton.assistant(controller: controller),
-        SizedBox(height: Responsive.vp(context, 0.2).clamp(2.0, 6.0)),
-        ShiftQuickToggleButton.recording(controller: controller),
+        _ShiftQuickControlsPanel(controller: controller),
       ],
     );
   }
@@ -337,6 +329,35 @@ class ShiftActionButton extends StatelessWidget {
   }
 }
 
+class _ShiftQuickControlsPanel extends StatelessWidget {
+  const _ShiftQuickControlsPanel({required this.controller});
+
+  final JourneyController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ShiftQuickToggleButton.trafficLight(
+                controller: controller,
+              ),
+            ),
+            SizedBox(width: Responsive.hp(context, 2.0).clamp(8.0, 10.0)),
+            Expanded(
+              child: ShiftQuickToggleButton.assistant(controller: controller),
+            ),
+          ],
+        ),
+        SizedBox(height: Responsive.vp(context, 1.0).clamp(8.0, 10.0)),
+        ShiftQuickToggleButton.recording(controller: controller),
+      ],
+    );
+  }
+}
+
 class ShiftQuickToggleButton extends StatelessWidget {
   const ShiftQuickToggleButton.trafficLight({
     super.key,
@@ -369,17 +390,36 @@ class ShiftQuickToggleButton extends StatelessWidget {
       final activeColor = _isTrafficLight
           ? AppColors.emerald
           : _isRecording
-          ? AppColors.rose
+          ? const Color(0xFFFF8A4C)
           : AppColors.electricCyan;
-      final inactiveColor = isDark
-          ? Colors.white70
-          : colorScheme.onSurface.withValues(alpha: 0.82);
-      final label = _isTrafficLight
-          ? (isActive ? 'Desativar semáforo' : 'Ativar semáforo')
-          : (isActive ? 'Desativar Assistente' : 'Ativar Assistente');
-      final effectiveLabel = _isRecording
-          ? (isActive ? 'Parar gravacao' : 'Ativar gravacao')
-          : label;
+      final inactiveColor = colorScheme.onSurfaceVariant.withValues(
+        alpha: isDark ? 0.76 : 0.82,
+      );
+      final icon = _isTrafficLight
+          ? Icons.traffic_rounded
+          : _isRecording
+          ? (isActive ? Icons.videocam_rounded : Icons.videocam_off_rounded)
+          : Icons.auto_awesome_rounded;
+      final title = _isTrafficLight
+          ? 'Semáforo'
+          : _isRecording
+          ? 'Gravação'
+          : 'Assistente';
+      final status = _isRecording
+          ? (isActive ? 'Ativo' : 'Inativo')
+          : (isActive ? 'Ativo' : 'Inativo');
+      final backgroundColor = _resolveToggleBackground(
+        colorScheme: colorScheme,
+        isDark: isDark,
+        isActive: isActive,
+      );
+      final borderColor = _resolveToggleBorder(
+        colorScheme: colorScheme,
+        isDark: isDark,
+        isActive: isActive,
+        activeColor: activeColor,
+      );
+      final foregroundColor = isActive ? activeColor : inactiveColor;
 
       return InkWell(
         onTap: _isTrafficLight
@@ -388,46 +428,318 @@ class ShiftQuickToggleButton extends StatelessWidget {
             ? () => PremiumAccessGuard().run(controller.toggleRecording)
             : () => PremiumAccessGuard().run(controller.toggleAssistant),
         borderRadius: BorderRadius.circular(
-          Responsive.sp(context, 12).clamp(8.0, 16.0),
+          Responsive.sp(context, 16).clamp(14.0, 18.0),
         ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: Responsive.vp(context, 1.0).clamp(6.0, 10.0),
+        child: Container(
+          width: double.infinity,
+          constraints: BoxConstraints(
+            minHeight: _isRecording
+                ? Responsive.vp(context, 7.0).clamp(56.0, 60.0)
+                : Responsive.vp(context, 7.8).clamp(62.0, 66.0),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_isTrafficLight && isActive)
-                PulseIcon(icon: Icons.traffic_rounded, color: activeColor)
-              else if (_isRecording && isActive)
-                PulseIcon(icon: Icons.videocam_rounded, color: activeColor)
-              else
-                Icon(
-                  _isTrafficLight
-                      ? Icons.traffic_rounded
-                      : _isRecording
-                      ? Icons.videocam_rounded
-                      : Icons.assistant_rounded,
-                  color: isActive ? activeColor : inactiveColor,
-                  size: Responsive.sp(context, 18).clamp(16.0, 20.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.hp(context, 2.8).clamp(10.0, 14.0),
+            vertical: _isRecording
+                ? Responsive.vp(context, 1.25).clamp(10.0, 12.0)
+                : Responsive.vp(context, 1.05).clamp(9.0, 11.0),
+          ),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(
+              Responsive.sp(context, 16).clamp(14.0, 18.0),
+            ),
+            border: Border.all(color: borderColor),
+          ),
+          child: _isRecording
+              ? _RecordingToggleContent(
+                  icon: icon,
+                  title: title,
+                  subtitle: isActive
+                      ? 'Registrando o turno atual'
+                      : 'Desligada no turno atual',
+                  status: status,
+                  foregroundColor: foregroundColor,
+                  isActive: isActive,
+                  activeColor: activeColor,
+                  inactiveColor: inactiveColor,
+                  isDark: isDark,
+                )
+              : _CompactToggleContent(
+                  icon: icon,
+                  title: title,
+                  status: status,
+                  foregroundColor: foregroundColor,
+                  isActive: isActive,
+                  activeColor: activeColor,
+                  inactiveColor: inactiveColor,
+                  isDark: isDark,
                 ),
-              SizedBox(width: Responsive.hp(context, 2.0).clamp(6.0, 10.0)),
-              Flexible(
-                child: Text(
-                  effectiveLabel,
-                  style: TextStyle(
-                    color: isActive ? activeColor : inactiveColor,
-                    fontSize: Responsive.sp(context, 14).clamp(12.0, 16.0),
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+        ),
+      );
+    });
+  }
+
+  Color _resolveToggleBackground({
+    required ColorScheme colorScheme,
+    required bool isDark,
+    required bool isActive,
+  }) {
+    if (_isRecording) {
+      if (!isDark) {
+        return isActive ? const Color(0xFFFFF0E8) : colorScheme.surface;
+      }
+      return isActive ? const Color(0xFF1D1512) : const Color(0xFF15161B);
+    }
+
+    if (!isActive) {
+      if (!isDark) {
+        return colorScheme.surface;
+      }
+      return const Color(0xFF17181D);
+    }
+
+    if (_isTrafficLight) {
+      if (!isDark) {
+        return const Color(0xFFEAF8F0);
+      }
+      return const Color(0xFF10231A);
+    }
+
+    if (!isDark) {
+      return const Color(0xFFEAF8FC);
+    }
+
+    return const Color(0xFF0D2230);
+  }
+
+  Color _resolveToggleBorder({
+    required ColorScheme colorScheme,
+    required bool isDark,
+    required bool isActive,
+    required Color activeColor,
+  }) {
+    if (_isRecording) {
+      if (!isDark) {
+        return isActive
+            ? const Color(0xFFFF8A4C).withValues(alpha: 0.46)
+            : colorScheme.outlineVariant;
+      }
+      return isActive ? const Color(0xFFB8552A) : const Color(0xFF292B33);
+    }
+
+    if (!isActive) {
+      if (!isDark) {
+        return colorScheme.outlineVariant;
+      }
+      return const Color(0xFF31333C);
+    }
+
+    return activeColor.withValues(alpha: isDark ? 0.72 : 0.45);
+  }
+}
+
+class _CompactToggleContent extends StatelessWidget {
+  const _CompactToggleContent({
+    required this.icon,
+    required this.title,
+    required this.status,
+    required this.foregroundColor,
+    required this.isActive,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String title;
+  final String status;
+  final Color foregroundColor;
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(height: Responsive.vp(context, 0.2).clamp(1.0, 2.0)),
+        Row(
+          children: [
+            if (isActive)
+              PulseIcon(icon: icon, color: activeColor)
+            else
+              Icon(
+                icon,
+                color: foregroundColor,
+                size: Responsive.sp(context, 17).clamp(15.0, 19.0),
+              ),
+            SizedBox(width: Responsive.hp(context, 1.6).clamp(6.0, 8.0)),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isActive && isDark
+                      ? Colors.white
+                      : isActive
+                      ? Theme.of(context).colorScheme.onSurface
+                      : inactiveColor,
+                  fontSize: Responsive.sp(context, 12).clamp(11.0, 13.0),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: Responsive.vp(context, 0.7).clamp(5.0, 7.0)),
+        Row(
+          children: [
+            Container(
+              width: Responsive.sp(context, 7).clamp(6.0, 7.0),
+              height: Responsive.sp(context, 7).clamp(6.0, 7.0),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? activeColor
+                    : inactiveColor.withValues(alpha: 0.55),
+                shape: BoxShape.circle,
+              ),
+            ),
+            SizedBox(width: Responsive.hp(context, 1.2).clamp(4.0, 6.0)),
+            Flexible(
+              child: Text(
+                status,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foregroundColor,
+                  fontSize: Responsive.sp(context, 11).clamp(10.0, 12.0),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: Responsive.vp(context, 0.2).clamp(1.0, 2.0)),
+      ],
+    );
+  }
+}
+
+class _RecordingToggleContent extends StatelessWidget {
+  const _RecordingToggleContent({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.foregroundColor,
+    required this.isActive,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String status;
+  final Color foregroundColor;
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = isActive ? activeColor : inactiveColor;
+
+    return Row(
+      children: [
+        Container(
+          width: Responsive.sp(context, 34).clamp(30.0, 36.0),
+          height: Responsive.sp(context, 34).clamp(30.0, 36.0),
+          decoration: BoxDecoration(
+            color: isDark
+                ? (isActive ? const Color(0xFF3A2119) : const Color(0xFF202128))
+                : (isActive
+                      ? const Color(0xFFFFE0CF)
+                      : Theme.of(context).colorScheme.surfaceContainerHighest),
+            borderRadius: BorderRadius.circular(
+              Responsive.sp(context, 12).clamp(10.0, 14.0),
+            ),
+          ),
+          child: Center(
+            child: isActive
+                ? PulseIcon(icon: icon, color: activeColor)
+                : Icon(
+                    icon,
+                    color: foregroundColor,
+                    size: Responsive.sp(context, 18).clamp(16.0, 20.0),
                   ),
-                  overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        SizedBox(width: Responsive.hp(context, 2.4).clamp(10.0, 12.0)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isActive && isDark
+                      ? Colors.white
+                      : isActive
+                      ? Theme.of(context).colorScheme.onSurface
+                      : inactiveColor,
+                  fontSize: Responsive.sp(context, 13).clamp(12.0, 14.0),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: Responsive.vp(context, 0.2).clamp(2.0, 4.0)),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isActive
+                      ? activeColor.withValues(alpha: 0.78)
+                      : inactiveColor.withValues(alpha: 0.78),
+                  fontSize: Responsive.sp(context, 11).clamp(10.0, 12.0),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
-      );
-    });
+        SizedBox(width: Responsive.hp(context, 2.0).clamp(8.0, 10.0)),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.hp(context, 2.0).clamp(8.0, 10.0),
+            vertical: Responsive.vp(context, 0.55).clamp(5.0, 6.0),
+          ),
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: isActive ? 0.20 : 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            status,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: Responsive.sp(context, 10).clamp(9.0, 11.0),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
