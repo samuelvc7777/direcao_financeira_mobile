@@ -12,7 +12,6 @@ import 'widgets/expenses_chart_section.dart';
 import 'widgets/goals_section.dart';
 import 'widgets/month_selector.dart';
 import 'widgets/recent_transactions_section.dart';
-import 'widgets/update_available_card.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
@@ -62,7 +61,6 @@ class HomeView extends GetView<HomeController> {
                     constraints: const BoxConstraints(maxWidth: 720),
                     child: Column(
                       children: [
-                        const UpdateAvailableCard(),
                         const MonthSelector(),
                         const BalanceCard(),
                         const AccountsSection(),

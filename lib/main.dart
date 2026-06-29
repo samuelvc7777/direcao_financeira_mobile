@@ -10,9 +10,11 @@ import 'app/core/bindings/app_binding.dart';
 import 'app/core/config/app_environment.dart';
 import 'app/core/location/location_tracking_service.dart';
 import 'app/core/notifications/notification_permission_service.dart';
+import 'app/core/update/app_update_controller.dart';
 import 'app/core/theme/app_scroll_behavior.dart';
 import 'app/core/theme/app_theme.dart';
 import 'app/data/local/get_storage_session_store.dart';
+import 'app/presentation/widgets/global_update_banner_overlay.dart';
 import 'app/routes/app_pages.dart';
 
 void main() async {
@@ -120,6 +122,24 @@ class MyApp extends StatelessWidget {
       initialBinding: AppBinding(environment: environment, storage: storage),
       initialRoute: initialRoute,
       getPages: AppPages.pages,
+      builder: (context, child) {
+        final routeChild = child ?? const SizedBox.shrink();
+        if (!Get.isRegistered<AppUpdateController>()) {
+          return routeChild;
+        }
+
+        final updateController = Get.find<AppUpdateController>();
+        return Obx(
+          () => GlobalUpdateBannerOverlay(
+            show: updateController.shouldShowBanner,
+            badgeText: updateController.badgeText,
+            forceUpdate: updateController.forceUpdate,
+            onUpdate: updateController.openStore,
+            onCancel: updateController.dismiss,
+            child: routeChild,
+          ),
+        );
+      },
     );
   }
 }

@@ -17,7 +17,6 @@ import '../../../domain/usecases/credit_card_use_cases.dart';
 import '../../../domain/usecases/goal_use_cases.dart';
 import '../../../domain/usecases/subscription_use_cases.dart';
 import '../../../domain/usecases/transaction_use_cases.dart';
-import '../../../core/update/play_store_update_service.dart';
 import 'home_controller.dart';
 import 'home_tab_navigation.dart';
 
@@ -107,13 +106,6 @@ class HomeBinding extends Bindings {
     if (!Get.isRegistered<HomeTabNavigation>()) {
       Get.lazyPut<HomeTabNavigation>(() => GetHomeTabNavigation(), fenix: true);
     }
-    if (!Get.isRegistered<AppUpdateService>()) {
-      Get.lazyPut<AppUpdateService>(
-        () => PlayStoreUpdateService(),
-        fenix: true,
-      );
-    }
-
     if (!Get.isRegistered<HomeController>()) {
       Get.lazyPut<HomeController>(
         () => HomeController(
@@ -139,7 +131,6 @@ class HomeBinding extends Bindings {
           dashboardRefreshNotifier: Get.find<DashboardRefreshNotifier>(),
           homeTabNavigation: Get.find<HomeTabNavigation>(),
           realtimeClient: Get.find<RealtimeClient>(),
-          appUpdateService: Get.find<AppUpdateService>(),
         ),
         fenix: true,
       );

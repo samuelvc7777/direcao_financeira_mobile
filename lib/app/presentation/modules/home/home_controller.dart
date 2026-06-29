@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import '../../../core/dashboard/dashboard_refresh_notifier.dart';
 import '../../../core/feedback/app_snackbar.dart';
 import '../../../core/network/realtime_client.dart';
-import '../../../core/update/play_store_update_service.dart';
 import '../../../domain/entities/bank_account_entity.dart';
 import '../../../domain/entities/category_entity.dart';
 import '../../../domain/entities/credit_card_entity.dart';
@@ -41,7 +40,6 @@ class HomeController extends GetxController {
     required this.dashboardRefreshNotifier,
     required this.homeTabNavigation,
     required this.realtimeClient,
-    required this.appUpdateService,
   });
 
   final GetStoredUserUseCase getStoredUserUseCase;
@@ -59,7 +57,6 @@ class HomeController extends GetxController {
   final DashboardRefreshNotifier dashboardRefreshNotifier;
   final HomeTabNavigation homeTabNavigation;
   final RealtimeClient realtimeClient;
-  final AppUpdateService appUpdateService;
 
   final isLoading = true.obs;
   final userName = ''.obs;
@@ -70,8 +67,6 @@ class HomeController extends GetxController {
   final ultimasTransacoes = <TransactionEntity>[].obs;
   final gastosPorCategoria = <HomeExpenseChartItem>[].obs;
   final processingInvoiceCardIds = <int>[].obs;
-  final isUpdateAvailable = false.obs;
-  final isCheckingUpdate = false.obs;
 
   final goals = <GoalEntity>[].obs;
 
@@ -98,7 +93,6 @@ class HomeController extends GetxController {
     unawaited(_refreshStoredSubscription());
     loadDashboardData();
     _setupSocketListeners();
-    unawaited(_checkForAppUpdate());
     _dashboardRefreshWorker = ever<int>(dashboardRefreshNotifier.refreshTick, (
       _,
     ) {
@@ -440,10 +434,6 @@ class HomeController extends GetxController {
 
   void openTransactionsTab() => homeTabNavigation.openTransactionsTab();
 
-  Future<void> openAppStore() async {
-    await appUpdateService.openStorePage();
-  }
-
   void openGoals() => Get.toNamed(AppRoutes.goals);
 
   Future<void> logout() async {
@@ -569,27 +559,6 @@ class HomeController extends GetxController {
     }
 
     return 'Fatura do cartao "${card.name}" paga com ${bankAccount.name}.';
-  }
-
-  Future<void> _checkForAppUpdate() async {
-    if (isCheckingUpdate.value) {
-      return;
-    }
-
-    isCheckingUpdate.value = true;
-    try {
-      final available = await appUpdateService.hasUpdateAvailable();
-      isUpdateAvailable.value = available;
-      debugPrint(
-        '[HomeController] Verificacao de update concluida -> disponivel=$available',
-      );
-    } catch (error, stackTrace) {
-      debugPrint('[HomeController] Falha ao verificar update: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      isUpdateAvailable.value = false;
-    } finally {
-      isCheckingUpdate.value = false;
-    }
   }
 
   void _showFeedback(String title, String message) {

@@ -17,6 +17,8 @@ import '../network/api_request_logger.dart';
 import '../preferences/app_preferences.dart';
 import '../session/session_coordinator.dart';
 import '../session/session_store.dart';
+import '../update/app_update_controller.dart';
+import '../update/play_store_update_service.dart';
 import '../session/user_cache.dart';
 
 class CoreBinding extends Bindings {
@@ -93,6 +95,15 @@ class CoreBinding extends Bindings {
     if (!Get.isRegistered<ApiRequestLogger>()) {
       Get.put<ApiRequestLogger>(
         ApiRequestLogger(apiErrorMapper: Get.find<ApiErrorMapper>()),
+        permanent: true,
+      );
+    }
+    if (!Get.isRegistered<AppUpdateService>()) {
+      Get.put<AppUpdateService>(PlayStoreUpdateService(), permanent: true);
+    }
+    if (!Get.isRegistered<AppUpdateController>()) {
+      Get.put<AppUpdateController>(
+        AppUpdateController(appUpdateService: Get.find<AppUpdateService>()),
         permanent: true,
       );
     }
