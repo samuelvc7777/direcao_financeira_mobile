@@ -243,6 +243,8 @@ class _ActivePlanExperience extends StatelessWidget {
                   subscription: subscription,
                 ),
                 const SizedBox(height: 16),
+                _CanceledRenewalPlanSection(controller: controller),
+                const SizedBox(height: 16),
               ],
               if (isGooglePlayManaged) ...[
                 _PlayStoreNote(
@@ -266,23 +268,77 @@ class _ActivePlanExperience extends StatelessWidget {
                   message:
                       'Os dados desta assinatura vem do banco de dados. Para migrar para cobranca automatica, assine pela Play Store quando o plano atual nao estiver mais ativo.',
                 ),
-              if (isRenewalCanceled) ...[
-                const SizedBox(height: 10),
-                Obx(
-                  () => CustomFilledButton(
-                    text: 'REATIVAR NA PLAY STORE',
-                    icon: Icons.autorenew_rounded,
-                    isLoading:
-                        controller.isActionLoading.value ||
-                        controller.isPurchaseLoading.value ||
-                        controller.isStoreSyncingPurchase.value,
-                    onPressed: controller.canPurchaseSelectedPlan
-                        ? controller.purchaseSelectedPlan
-                        : null,
-                  ),
-                ),
-              ],
+              if (isRenewalCanceled) const SizedBox(height: 10),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CanceledRenewalPlanSection extends StatelessWidget {
+  const _CanceledRenewalPlanSection({required this.controller});
+
+  final SubscriptionController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Escolha como reativar',
+          style: TextStyle(
+            color: cs.onSurface,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Voce pode continuar no plano atual ou selecionar outro ciclo antes de reativar pela Google Play.',
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.68),
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (!controller.hasPlanCatalog.value)
+          _QuietMessageCard(
+            icon: Icons.inventory_2_outlined,
+            title: 'Nenhum plano ativo',
+            message: 'O catalogo de planos ainda nao retornou opcoes.',
+          )
+        else
+          _PlanPicker(controller: controller),
+        const SizedBox(height: 14),
+        Obx(() {
+          final plan = controller.selectedPlan;
+          if (plan == null || !controller.usesPlayStoreBilling) {
+            return const SizedBox.shrink();
+          }
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _SubscriptionTermsCard(
+              terms: _subscriptionTermsFull(controller, plan),
+            ),
+          );
+        }),
+        Obx(
+          () => CustomFilledButton(
+            text: _reactivationCtaLabel(controller.selectedPlan),
+            icon: Icons.autorenew_rounded,
+            isLoading:
+                controller.isActionLoading.value ||
+                controller.isPurchaseLoading.value ||
+                controller.isStoreSyncingPurchase.value,
+            onPressed: controller.canPurchaseSelectedPlan
+                ? controller.purchaseSelectedPlan
+                : null,
           ),
         ),
       ],
@@ -333,7 +389,7 @@ class _RenewalCanceledCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Voce ainda tem acesso ate $endDate. Reative pela Play Store antes do prazo vencer para nao perder os recursos premium.',
+                  'Voce ainda tem acesso ate $endDate. Reative pela Play Store antes do prazo vencer para nao perder os recursos premium. Se quiser, escolha outro plano antes de reativar.',
                   style: TextStyle(
                     color: cs.onSurface.withValues(alpha: 0.72),
                     height: 1.35,
@@ -1198,4 +1254,12 @@ String _billingCycleLabel(PlanEntity plan) {
     return 'mês';
   }
   return '${plan.durationDays} dias';
+}
+
+String _reactivationCtaLabel(PlanEntity? plan) {
+  if (plan == null) {
+    return 'SELECIONE UM PLANO';
+  }
+
+  return 'REATIVAR ${_planName(plan).toUpperCase()}';
 }

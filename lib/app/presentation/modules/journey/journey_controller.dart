@@ -2206,7 +2206,7 @@ class JourneyController extends GetxController with WidgetsBindingObserver {
       return Geolocator.openLocationSettings();
     }
 
-    if (status.hasForegroundPermission && !status.hasBackgroundPermission) {
+    if (!status.hasBackgroundPermission) {
       return const LocationPermissionSettings()
           .openBackgroundLocationPermissionSettings();
     }

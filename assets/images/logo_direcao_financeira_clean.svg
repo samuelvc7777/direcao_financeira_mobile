@@ -1,0 +1,56 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badge" x1="195" y1="147" x2="829" y2="877" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#231331"/>
+      <stop offset="0.55" stop-color="#11131E"/>
+      <stop offset="1" stop-color="#2A1640"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="273" y1="196" x2="769" y2="775" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C15CFF"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="green" x1="245" y1="366" x2="596" y2="246" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7CF043"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="662" y1="338" x2="803" y2="486" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE082"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <filter id="softShadow" x="94" y="94" width="836" height="836" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="216" fill="#0B0B10"/>
+
+  <g filter="url(#softShadow)">
+    <circle cx="512" cy="512" r="382" fill="url(#badge)"/>
+    <circle cx="512" cy="512" r="382" stroke="url(#purple)" stroke-width="28"/>
+    <circle cx="512" cy="512" r="333" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="4"/>
+  </g>
+
+  <path d="M232 371C302 334 369 297 433 255C464 235 493 215 526 191" stroke="url(#green)" stroke-width="30" stroke-linecap="round"/>
+  <path d="M521 191L521 282L599 235L521 191Z" fill="#7CF043"/>
+
+  <rect x="245" y="423" width="47" height="137" rx="14" fill="#8B5CF6"/>
+  <rect x="319" y="379" width="47" height="181" rx="14" fill="#A855F7"/>
+  <rect x="393" y="330" width="47" height="230" rx="14" fill="#C084FC"/>
+
+  <circle cx="734" cy="413" r="82" fill="url(#gold)"/>
+  <circle cx="734" cy="413" r="61" stroke="#78350F" stroke-opacity="0.22" stroke-width="12"/>
+  <path d="M734 358V468" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round"/>
+  <path d="M770 382C758 367 740 361 719 367C695 374 690 402 716 412L751 426C775 435 773 466 747 474C724 481 699 474 685 456" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M317 529L374 434C386 414 408 402 431 402H572C595 402 617 414 629 434L686 529" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M297 532C307 502 335 482 367 482H653C685 482 713 502 723 532L740 586C746 606 731 626 710 626H314C293 626 278 606 284 586L297 532Z" fill="#F8FAFC"/>
+  <path d="M358 522H455L430 462H397C382 462 369 470 362 483L340 522H358Z" fill="#111827"/>
+  <path d="M569 522H666L644 483C637 470 624 462 609 462H576L551 522H569Z" fill="#111827"/>
+  <path d="M348 570H421" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+  <path d="M603 570H676" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+  <path d="M451 590H573" stroke="#111827" stroke-width="19" stroke-linecap="round"/>
+
+  <path d="M250 677H774" stroke="#8B5CF6" stroke-width="8" stroke-linecap="round"/>
+  <text x="512" y="754" text-anchor="middle" fill="#FFFFFF" font-family="Inter, Montserrat, Arial, sans-serif" font-size="82" font-weight="800" letter-spacing="0">DIREÇÃO</text>
+  <text x="512" y="829" text-anchor="middle" fill="#A855F7" font-family="Inter, Montserrat, Arial, sans-serif" font-size="63" font-weight="800" letter-spacing="0">FINANCEIRA</text>
+</svg>

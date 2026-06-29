@@ -26,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private val recordingChannelName = "com.direcao_financeira/recording"
     private val mapsChannelName = "com.direcao_financeira/maps"
     private var backgroundLocationPermissionResult: MethodChannel.Result? = null
+    private var foregroundLocationPermissionResult: MethodChannel.Result? = null
     private var recordingPermissionResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -206,8 +207,23 @@ class MainActivity : FlutterActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_BACKGROUND_LOCATION_PERMISSION) {
-            backgroundLocationPermissionResult?.success(true)
+            val granted = grantResults.isNotEmpty() &&
+                grantResults.any { it == PackageManager.PERMISSION_GRANTED }
+            backgroundLocationPermissionResult?.success(
+                granted || openAppLocationPermissionSettings(),
+            )
             backgroundLocationPermissionResult = null
+        }
+        if (requestCode == REQUEST_FOREGROUND_LOCATION_PERMISSION) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults.any { it == PackageManager.PERMISSION_GRANTED }
+            if (granted) {
+                requestBackgroundLocationPermission()
+            } else {
+                foregroundLocationPermissionResult?.success(false)
+                foregroundLocationPermissionResult = null
+                backgroundLocationPermissionResult = null
+            }
         }
         if (requestCode == REQUEST_RECORDING_PERMISSIONS) {
             val granted = grantResults.isNotEmpty() &&
@@ -275,12 +291,7 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        if (!hasForegroundLocationPermission()) {
-            result.success(openAppDetailsSettings())
-            return
-        }
-
-        if (backgroundLocationPermissionResult != null) {
+        if (backgroundLocationPermissionResult != null || foregroundLocationPermissionResult != null) {
             result.error(
                 "REQUEST_IN_PROGRESS",
                 "Ja existe uma solicitacao de localizacao em andamento.",
@@ -290,6 +301,24 @@ class MainActivity : FlutterActivity() {
         }
 
         backgroundLocationPermissionResult = result
+        if (!hasForegroundLocationPermission()) {
+            foregroundLocationPermissionResult = result
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+                REQUEST_FOREGROUND_LOCATION_PERMISSION,
+            )
+            return
+        }
+
+        requestBackgroundLocationPermission()
+    }
+
+    private fun requestBackgroundLocationPermission() {
+        foregroundLocationPermissionResult = null
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
@@ -346,6 +375,31 @@ class MainActivity : FlutterActivity() {
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             ) == PackageManager.PERMISSION_GRANTED
         return fineGranted || coarseGranted
+    }
+
+    private fun openAppLocationPermissionSettings(): Boolean {
+        val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
+            putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+            putExtra("android.intent.extra.PERMISSION_NAME", Manifest.permission.ACCESS_FINE_LOCATION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        if (intent.resolveActivity(packageManager) != null) {
+            return runCatching {
+                startActivity(intent)
+                true
+            }.getOrDefault(false)
+        }
+
+        val permissionsIntent = Intent("android.settings.APP_PERMISSIONS_SETTINGS").apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        return runCatching {
+            startActivity(permissionsIntent)
+            true
+        }.getOrDefault(false)
     }
 
     private fun openAppDetailsSettings(): Boolean {
@@ -418,6 +472,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val REQUEST_BACKGROUND_LOCATION_PERMISSION = 7301
         private const val REQUEST_RECORDING_PERMISSIONS = 7302
+        private const val REQUEST_FOREGROUND_LOCATION_PERMISSION = 7303
     }
 }
 
