@@ -26,8 +26,6 @@ class GetStorageUserCache implements UserCache {
               isActive: user.isActive,
               createdAt: user.createdAt,
               updatedAt: user.updatedAt,
-              phone: user.phone,
-              referralCode: user.referralCode,
               profilePhotoBase64: user.profilePhotoBase64,
               activeSubscription: user.activeSubscription,
               subscriptions: user.subscriptions,

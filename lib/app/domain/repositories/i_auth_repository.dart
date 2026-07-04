@@ -9,9 +9,7 @@ abstract class IAuthRepository {
     String name,
     String email,
     String password,
-    String phone, {
-    String? referralCode,
-  });
+  );
   Future<Either<Failure, void>> sendPasswordResetEmail(String email);
   Future<Either<Failure, void>> updatePassword(String password);
   Future<Either<Failure, UserEntity>> updateProfilePhotoBase64(

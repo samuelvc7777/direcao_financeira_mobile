@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/help_video_entity.dart';
-
 enum PremiumPlan { monthly, yearly }
 
 class PremiumAccessBanner extends StatefulWidget {
@@ -10,15 +8,11 @@ class PremiumAccessBanner extends StatefulWidget {
     required this.onViewSubscription,
     this.onStartTrial,
     this.onRestoreSubscription,
-    this.demoVideo,
-    this.onWatchDemoVideo,
   });
 
   final VoidCallback onViewSubscription;
   final ValueChanged<PremiumPlan>? onStartTrial;
   final VoidCallback? onRestoreSubscription;
-  final HelpVideoEntity? demoVideo;
-  final VoidCallback? onWatchDemoVideo;
 
   @override
   State<PremiumAccessBanner> createState() => _PremiumAccessBannerState();
@@ -67,8 +61,6 @@ class _PremiumAccessBannerState extends State<PremiumAccessBanner> {
                         : () => widget.onStartTrial!(selectedPlan),
                     onViewPlans: widget.onViewSubscription,
                     onRestoreSubscription: widget.onRestoreSubscription,
-                    demoVideo: widget.demoVideo,
-                    onWatchDemoVideo: widget.onWatchDemoVideo,
                   ),
                 ),
               ),
@@ -87,8 +79,6 @@ class _PremiumTrialCard extends StatelessWidget {
     required this.onViewPlans,
     this.onStartTrial,
     this.onRestoreSubscription,
-    this.demoVideo,
-    this.onWatchDemoVideo,
   });
 
   final PremiumPlan selectedPlan;
@@ -96,8 +86,6 @@ class _PremiumTrialCard extends StatelessWidget {
   final VoidCallback? onStartTrial;
   final VoidCallback onViewPlans;
   final VoidCallback? onRestoreSubscription;
-  final HelpVideoEntity? demoVideo;
-  final VoidCallback? onWatchDemoVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -139,10 +127,6 @@ class _PremiumTrialCard extends StatelessWidget {
               const _TopPremiumRow(),
               const SizedBox(height: 16),
               const _TrialHero(),
-              if (demoVideo != null) ...[
-                const SizedBox(height: 14),
-                _DemoVideoPreview(video: demoVideo!, onTap: onWatchDemoVideo),
-              ],
               const SizedBox(height: 16),
               const _PlansHeader(),
               const SizedBox(height: 10),
@@ -187,129 +171,6 @@ class _PremiumTrialCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _DemoVideoPreview extends StatelessWidget {
-  const _DemoVideoPreview({required this.video, required this.onTap});
-
-  final HelpVideoEntity video;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.08),
-                const Color(0xFF4361EE).withValues(alpha: 0.10),
-              ],
-            ),
-            border: Border.all(
-              color: const Color(0xFF93C5FD).withValues(alpha: 0.18),
-            ),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Image.network(
-                      video.resolvedThumbnailUrl,
-                      width: 118,
-                      height: 74,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 118,
-                        height: 74,
-                        color: const Color(0xFF111827),
-                      ),
-                    ),
-                    Container(
-                      width: 118,
-                      height: 74,
-                      color: Colors.black.withValues(alpha: 0.26),
-                    ),
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.24),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Color(0xFF111827),
-                        size: 31,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Veja o app em acao',
-                      style: TextStyle(
-                        color: const Color(0xFF93C5FD).withValues(alpha: 0.92),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.7,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      video.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.5,
-                        height: 1.18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'Toque para assistir ao video demonstrativo.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.58),
-                        fontSize: 12,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

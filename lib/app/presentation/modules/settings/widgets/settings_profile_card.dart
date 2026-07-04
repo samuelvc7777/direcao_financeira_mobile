@@ -101,80 +101,53 @@ class SettingsProfileCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compactActions = constraints.maxWidth < 360;
-                final iconOnlyReferral = constraints.maxWidth < 320;
-                final showReferral = controller.canShowReferralEntryPoint.value;
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            controller.planName.value,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: compactActions ? 16 : 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${controller.remainingDays.value} dias restantes',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.7,
-                              ),
-                              fontSize: compactActions ? 12 : 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: compactActions ? 6 : 10),
-                    Flexible(
-                      flex: compactActions ? 2 : 3,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ProfileActionButton(
-                              label: compactActions ? 'Plano' : 'Ver plano',
-                              tooltip: 'Ver plano',
-                              icon: Icons.open_in_new_rounded,
-                              color: colorScheme.primary,
-                              compact: compactActions,
-                              onPressed: controller.openSubscription,
-                            ),
-                            if (showReferral) ...[
-                              SizedBox(width: compactActions ? 6 : 8),
-                              _ProfileActionButton(
-                                label: iconOnlyReferral ? null : 'Indicar',
-                                tooltip: 'Indicar',
-                                icon: Icons.card_giftcard_rounded,
-                                color: AppColors.emerald,
-                                compact: compactActions,
-                                onPressed: controller.openReferrals,
-                              ),
-                            ],
-                          ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.planName.value,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${controller.remainingDays.value} dias restantes',
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: controller.openSubscription,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                    side: BorderSide(
+                      color: colorScheme.primary.withValues(alpha: 0.34),
                     ),
-                  ],
-                );
-              },
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Ver plano'),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             ClipRRect(
@@ -190,59 +163,5 @@ class SettingsProfileCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _ProfileActionButton extends StatelessWidget {
-  const _ProfileActionButton({
-    required this.label,
-    required this.tooltip,
-    required this.icon,
-    required this.color,
-    required this.compact,
-    required this.onPressed,
-  });
-
-  final String? label;
-  final String tooltip;
-  final IconData icon;
-  final Color color;
-  final bool compact;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = OutlinedButton.styleFrom(
-      foregroundColor: color,
-      side: BorderSide(color: color.withValues(alpha: 0.34)),
-      padding: EdgeInsets.symmetric(
-        horizontal: label == null ? 10 : (compact ? 10 : 12),
-        vertical: compact ? 10 : 12,
-      ),
-      visualDensity: VisualDensity.compact,
-      minimumSize: Size(label == null ? 40 : 0, compact ? 40 : 44),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    );
-
-    final button = label == null
-        ? OutlinedButton(
-            onPressed: onPressed,
-            style: style,
-            child: Icon(icon, size: 16),
-          )
-        : OutlinedButton.icon(
-            onPressed: onPressed,
-            style: style,
-            icon: Icon(icon, size: 16),
-            label: Text(
-              label!,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-            ),
-          );
-
-    return Tooltip(message: tooltip, child: button);
   }
 }

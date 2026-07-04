@@ -43,10 +43,7 @@ class SupabaseUserScope {
   Future<UserModel> ensureUserProfileForAuthUser({
     required String email,
     required String name,
-    String? phone,
-    String? referralCode,
   }) async {
-    final normalizedPhone = _normalizePhone(phone);
     final existing = await client
         .from(SupabaseTableNames.users)
         .select()
@@ -54,30 +51,8 @@ class SupabaseUserScope {
         .maybeSingle();
 
     if (existing != null) {
-      final existingRow = Map<String, dynamic>.from(existing);
-      if (normalizedPhone != null &&
-          (existingRow['phone']?.toString().trim().isEmpty ?? true)) {
-        await _ensurePhoneIsAvailable(
-          normalizedPhone,
-          currentUserId: existingRow['id'] as int?,
-        );
-        await client
-            .from(SupabaseTableNames.users)
-            .update({
-              'phone': normalizedPhone,
-              'updatedAt': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', existingRow['id']);
-      }
       return getUserModelByEmail(email);
     }
-
-    if (normalizedPhone == null) {
-      throw const AuthException('Telefone obrigatorio para cadastro.');
-    }
-
-    await _ensurePhoneIsAvailable(normalizedPhone);
-    final insertedReferralCode = await _generateReferralCode(name);
 
     final inserted = await client
         .from(SupabaseTableNames.users)
@@ -87,27 +62,13 @@ class SupabaseUserScope {
           'password': 'SUPABASE_AUTH',
           'role': 'USER',
           'isActive': true,
-          'phone': normalizedPhone,
-          'referralCode': insertedReferralCode,
           'profilePhotoBase64': null,
           'updatedAt': DateTime.now().toUtc().toIso8601String(),
         })
         .select()
         .single();
 
-    final insertedUser = Map<String, dynamic>.from(inserted);
-    final normalizedReferralCode = referralCode?.trim().toUpperCase();
-    if (normalizedReferralCode != null && normalizedReferralCode.isNotEmpty) {
-      await client.rpc(
-        'register_referral_by_code',
-        params: {
-          'p_referred_user_id': insertedUser['id'],
-          'p_referral_code': normalizedReferralCode,
-        },
-      );
-    }
-
-    return _buildUserModel(insertedUser);
+    return _buildUserModel(Map<String, dynamic>.from(inserted));
   }
 
   Future<UserModel> updateCurrentUserProfilePhotoBase64({
@@ -193,60 +154,5 @@ class SupabaseUserScope {
       'activeSubscription': null,
       'subscriptions': const [],
     });
-  }
-
-  String? _normalizePhone(String? phone) {
-    final digits = phone?.replaceAll(RegExp(r'\D'), '') ?? '';
-    return digits.isEmpty ? null : digits;
-  }
-
-  Future<void> _ensurePhoneIsAvailable(
-    String phone, {
-    int? currentUserId,
-  }) async {
-    final query = client
-        .from(SupabaseTableNames.users)
-        .select('id')
-        .eq('phone', phone);
-    final existing = await query.maybeSingle();
-    if (existing == null) {
-      return;
-    }
-
-    final existingId = Map<String, dynamic>.from(existing)['id'] as int?;
-    if (currentUserId != null && existingId == currentUserId) {
-      return;
-    }
-
-    throw const AuthException(
-      'Este telefone ja esta cadastrado. Use outro numero ou faca login.',
-    );
-  }
-
-  Future<String> _generateReferralCode(String name) async {
-    final seed = name
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
-        .padRight(4, 'X')
-        .substring(0, 4);
-
-    for (var attempt = 0; attempt < 20; attempt++) {
-      final suffix = DateTime.now().microsecondsSinceEpoch
-          .remainder(100000 + attempt)
-          .toString()
-          .padLeft(5, '0')
-          .substring(0, 5);
-      final code = '$seed$suffix';
-      final existing = await client
-          .from(SupabaseTableNames.users)
-          .select('id')
-          .eq('referralCode', code)
-          .maybeSingle();
-      if (existing == null) {
-        return code;
-      }
-    }
-
-    throw const AuthException('Nao foi possivel gerar codigo de indicacao.');
   }
 }

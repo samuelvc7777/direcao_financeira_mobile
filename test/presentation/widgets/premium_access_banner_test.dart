@@ -1,5 +1,4 @@
 import 'package:direcao_financeira_mobile/app/core/theme/app_theme.dart';
-import 'package:direcao_financeira_mobile/app/domain/entities/help_video_entity.dart';
 import 'package:direcao_financeira_mobile/app/presentation/widgets/premium_access_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,38 +46,5 @@ void main() {
       isEmpty,
     );
     expect(find.byType(Scrollable), findsNothing);
-  });
-
-  testWidgets('renderiza video demonstrativo e executa callback', (
-    tester,
-  ) async {
-    var watched = false;
-    await tester.pumpWidget(
-      GetMaterialApp(
-        theme: AppTheme.dark,
-        home: Scaffold(
-          body: PremiumAccessBanner(
-            onViewSubscription: () {},
-            demoVideo: HelpVideoEntity(
-              id: 'demo',
-              title: 'Conheca o app',
-              description: 'Video demonstrativo',
-              youtubeVideoId: 'HxgGW_ECu0w',
-              sortOrder: 0,
-              isFeatured: true,
-            ),
-            onWatchDemoVideo: () => watched = true,
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('Veja o app em acao'), findsOneWidget);
-    expect(find.text('Conheca o app'), findsOneWidget);
-
-    await tester.tap(find.text('Conheca o app'));
-    await tester.pump();
-
-    expect(watched, isTrue);
   });
 }

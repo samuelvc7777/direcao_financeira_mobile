@@ -68,16 +68,12 @@ class AuthRepository implements IAuthRepository {
     String name,
     String email,
     String password,
-    String phone, {
-    String? referralCode,
-  }) async {
+  ) async {
     try {
       final response = await remoteDataSource.register(
         name: name,
         email: email,
         password: password,
-        phone: phone,
-        referralCode: referralCode,
       );
       await sessionCoordinator.handleAuthenticatedSession(response);
       return Right(response.user);
@@ -227,8 +223,6 @@ class AuthRepository implements IAuthRepository {
               isActive: user.isActive,
               createdAt: user.createdAt,
               updatedAt: user.updatedAt,
-              phone: user.phone,
-              referralCode: user.referralCode,
               profilePhotoBase64: user.profilePhotoBase64,
               activeSubscription: user.activeSubscription,
               subscriptions: user.subscriptions,

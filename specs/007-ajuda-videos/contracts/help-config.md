@@ -25,9 +25,6 @@ Regras:
 - URLs completas do YouTube podem ser aceitas como fallback e normalizadas para ID.
 - A lista deve ser ordenada por `sortOrder`.
 - O video deve ser reproduzido dentro do app.
-- O video demonstrativo usado no banner de assinatura e em Ajustes deve ser o primeiro video ativo com `is_featured=true`.
-- Se nenhum video ativo estiver marcado como destaque, o app pode usar o primeiro video ativo ordenado como fallback.
-- O painel admin deve garantir que apenas um video ativo fique marcado com `is_featured=true` para evitar ambiguidade editorial.
 
 ## WhatsApp
 

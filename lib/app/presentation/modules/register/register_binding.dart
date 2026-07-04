@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import '../../../domain/repositories/i_category_repository.dart';
 import '../../../domain/usecases/category_use_cases.dart';
 import '../../../domain/usecases/register_use_case.dart';
-import '../../../domain/usecases/referral_settings_use_cases.dart';
 import 'register_controller.dart';
 
 class RegisterBinding extends Bindings {
@@ -29,10 +28,6 @@ class RegisterBinding extends Bindings {
         registerUseCase: Get.find<RegisterUseCase>(),
         ensureDefaultCategoriesUseCase:
             Get.find<EnsureDefaultCategoriesUseCase>(),
-        getReferralSettingsUseCase:
-            Get.isRegistered<GetReferralSettingsUseCase>()
-            ? Get.find<GetReferralSettingsUseCase>()
-            : null,
       ),
       fenix: true,
     );

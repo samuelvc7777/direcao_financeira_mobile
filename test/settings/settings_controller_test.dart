@@ -45,9 +45,7 @@ class _FakeAuthRepository implements IAuthRepository {
     String name,
     String email,
     String password,
-    String phone, {
-    String? referralCode,
-  }) {
+  ) {
     throw UnimplementedError();
   }
 
@@ -78,8 +76,6 @@ class _FakeAuthRepository implements IAuthRepository {
       isActive: storedUser!.isActive,
       createdAt: storedUser!.createdAt,
       updatedAt: storedUser!.updatedAt,
-      phone: storedUser!.phone,
-      referralCode: storedUser!.referralCode,
       profilePhotoBase64: profilePhotoBase64,
       activeSubscription: storedUser!.activeSubscription,
       subscriptions: storedUser!.subscriptions,
@@ -345,9 +341,8 @@ void main() {
           getMySubscriptionUseCase: GetMySubscriptionUseCase(
             subscriptionRepository,
           ),
-          syncStoredUserSubscriptionUseCase: SyncStoredUserSubscriptionUseCase(
-            subscriptionRepository,
-          ),
+          syncStoredUserSubscriptionUseCase:
+              SyncStoredUserSubscriptionUseCase(subscriptionRepository),
         );
         Get.put(controller);
 

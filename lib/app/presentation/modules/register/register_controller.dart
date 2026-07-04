@@ -4,23 +4,18 @@ import 'package:get/get.dart';
 import '../../../core/feedback/app_snackbar.dart';
 import '../../../domain/usecases/category_use_cases.dart';
 import '../../../domain/usecases/register_use_case.dart';
-import '../../../domain/usecases/referral_settings_use_cases.dart';
 import '../../../routes/app_pages.dart';
 
 class RegisterController extends GetxController {
   RegisterController({
     required this.registerUseCase,
     required this.ensureDefaultCategoriesUseCase,
-    this.getReferralSettingsUseCase,
   });
 
   final RegisterUseCase registerUseCase;
   final EnsureDefaultCategoriesUseCase ensureDefaultCategoriesUseCase;
-  final GetReferralSettingsUseCase? getReferralSettingsUseCase;
   final nameController = TextEditingController();
   final emailController = TextEditingController();
-  final phoneController = TextEditingController();
-  final referralCodeController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -28,7 +23,6 @@ class RegisterController extends GetxController {
   final isPasswordVisible = false.obs;
   final isConfirmPasswordVisible = false.obs;
   final acceptedSensitiveDataConsent = false.obs;
-  final showReferralCodeInput = true.obs;
 
   final hasMinLength = false.obs;
   final hasUppercase = false.obs;
@@ -41,20 +35,6 @@ class RegisterController extends GetxController {
     super.onInit();
     passwordController.addListener(_validatePassword);
     confirmPasswordController.addListener(_validatePassword);
-    _loadReferralSettings();
-  }
-
-  Future<void> _loadReferralSettings() async {
-    final useCase = getReferralSettingsUseCase;
-    if (useCase == null) return;
-
-    final result = await useCase();
-    result.fold((_) => showReferralCodeInput.value = true, (settings) {
-      showReferralCodeInput.value = settings.canShowRegisterInput;
-      if (!settings.canShowRegisterInput) {
-        referralCodeController.clear();
-      }
-    });
   }
 
   void _validatePassword() {
@@ -86,16 +66,11 @@ class RegisterController extends GetxController {
 
     final name = nameController.text.trim();
     final email = emailController.text.trim();
-    final phone = phoneController.text.trim();
-    final referralCode = showReferralCodeInput.value
-        ? referralCodeController.text.trim()
-        : '';
     final password = passwordController.text.trim();
     final confirmPassword = confirmPasswordController.text.trim();
 
     if (name.isEmpty ||
         email.isEmpty ||
-        phone.isEmpty ||
         password.isEmpty ||
         confirmPassword.isEmpty) {
       _showError('Erro', 'Por favor, preencha todos os campos.');
@@ -108,13 +83,7 @@ class RegisterController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await registerUseCase.execute(
-      name,
-      email,
-      password,
-      phone,
-      referralCode: referralCode.isEmpty ? null : referralCode,
-    );
+    final result = await registerUseCase.execute(name, email, password);
 
     await result.fold(
       (failure) async {
@@ -159,8 +128,6 @@ class RegisterController extends GetxController {
   void onClose() {
     nameController.dispose();
     emailController.dispose();
-    phoneController.dispose();
-    referralCodeController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.onClose();

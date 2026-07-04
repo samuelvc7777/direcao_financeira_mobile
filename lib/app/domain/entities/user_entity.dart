@@ -8,8 +8,6 @@ class UserEntity {
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final String? phone;
-  final String? referralCode;
   final String? profilePhotoBase64;
   final SubscriptionEntity? activeSubscription;
   final List<SubscriptionEntity> subscriptions;
@@ -22,8 +20,6 @@ class UserEntity {
     required this.isActive,
     this.createdAt,
     this.updatedAt,
-    this.phone,
-    this.referralCode,
     this.profilePhotoBase64,
     this.activeSubscription,
     this.subscriptions = const [],

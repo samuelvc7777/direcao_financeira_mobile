@@ -56,11 +56,7 @@ class SupabaseAuthRemoteDataSource implements IAuthRemoteDataSource {
     required String name,
     required String email,
     required String password,
-    required String phone,
-    String? referralCode,
   }) async {
-    await _validateRegistrationInputs(phone: phone, referralCode: referralCode);
-
     final response = await client.auth.signUp(
       email: email,
       password: password,
@@ -88,8 +84,6 @@ class SupabaseAuthRemoteDataSource implements IAuthRemoteDataSource {
     final user = await userScope.ensureUserProfileForAuthUser(
       email: email,
       name: name,
-      phone: phone,
-      referralCode: referralCode,
     );
 
     return AuthSessionDto(
@@ -117,32 +111,6 @@ class SupabaseAuthRemoteDataSource implements IAuthRemoteDataSource {
   }) {
     return userScope.updateCurrentUserProfilePhotoBase64(
       profilePhotoBase64: profilePhotoBase64,
-    );
-  }
-
-  Future<void> _validateRegistrationInputs({
-    required String phone,
-    String? referralCode,
-  }) async {
-    final response = await client.rpc(
-      'validate_registration_inputs',
-      params: {
-        'p_phone': phone,
-        'p_referral_code': referralCode?.trim().isEmpty == true
-            ? null
-            : referralCode,
-      },
-    );
-
-    final data = response is Map
-        ? Map<String, dynamic>.from(response)
-        : const <String, dynamic>{};
-    if (data['valid'] == true) {
-      return;
-    }
-
-    throw AuthException(
-      data['message']?.toString() ?? 'Nao foi possivel validar o cadastro.',
     );
   }
 }
