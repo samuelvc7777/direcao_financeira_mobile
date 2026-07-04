@@ -64,7 +64,9 @@ class _FakeAuthRepository implements IAuthRepository {
     String name,
     String email,
     String password,
-  ) async => throw UnimplementedError();
+    String phone, {
+    String? referralCode,
+  }) async => throw UnimplementedError();
 
   @override
   Future<Either<Failure, void>> sendPasswordResetEmail(String email) async =>

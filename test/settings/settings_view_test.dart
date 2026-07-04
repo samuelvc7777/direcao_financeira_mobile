@@ -40,7 +40,9 @@ class _FakeAuthRepository implements IAuthRepository {
     String name,
     String email,
     String password,
-  ) {
+    String phone, {
+    String? referralCode,
+  }) {
     throw UnimplementedError();
   }
 

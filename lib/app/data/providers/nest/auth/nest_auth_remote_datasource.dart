@@ -29,10 +29,19 @@ class NestAuthRemoteDataSource implements IAuthRemoteDataSource {
     required String name,
     required String email,
     required String password,
+    required String phone,
+    String? referralCode,
   }) async {
     final response = await dio.post(
       '/auth/register',
-      data: {'name': name, 'email': email, 'password': password},
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'phone': phone,
+        if (referralCode?.trim().isNotEmpty == true)
+          'referralCode': referralCode!.trim().toUpperCase(),
+      },
     );
 
     return AuthSessionDto.fromJson(

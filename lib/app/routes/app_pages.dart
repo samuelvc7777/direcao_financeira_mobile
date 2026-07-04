@@ -46,6 +46,8 @@ import '../presentation/modules/goals/goals_binding.dart';
 import '../presentation/modules/goals/goals_view.dart';
 import '../presentation/modules/help/help_binding.dart';
 import '../presentation/modules/help/help_view.dart';
+import '../presentation/modules/referrals/referrals_binding.dart';
+import '../presentation/modules/referrals/referrals_view.dart';
 import '../domain/entities/transaction_entity.dart';
 
 class AppRoutes {
@@ -75,6 +77,7 @@ class AppRoutes {
   static const String costsGainsWizard = '/costs-gains-wizard';
   static const String goals = '/goals';
   static const String help = '/help';
+  static const String referrals = '/referrals';
 }
 
 class AppPages {
@@ -259,6 +262,13 @@ class AppPages {
       name: AppRoutes.help,
       page: () => const HelpView(),
       binding: HelpBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.referrals,
+      page: () => const ReferralsView(),
+      binding: ReferralsBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

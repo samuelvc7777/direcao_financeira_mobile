@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AuthTextField extends StatefulWidget {
   const AuthTextField({
@@ -11,6 +12,7 @@ class AuthTextField extends StatefulWidget {
     this.keyboardType,
     this.textCapitalization = TextCapitalization.none,
     this.textInputAction,
+    this.inputFormatters,
     this.obscureText = false,
     this.onTogglePassword,
     this.onSubmitted,
@@ -24,6 +26,7 @@ class AuthTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final TextCapitalization textCapitalization;
   final TextInputAction? textInputAction;
+  final List<TextInputFormatter>? inputFormatters;
   final bool obscureText;
   final VoidCallback? onTogglePassword;
   final ValueChanged<String>? onSubmitted;
@@ -105,6 +108,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
                       keyboardType: widget.keyboardType,
                       textCapitalization: widget.textCapitalization,
                       textInputAction: widget.textInputAction,
+                      inputFormatters: widget.inputFormatters,
                       onSubmitted: widget.onSubmitted,
                       style: TextStyle(
                         color: foreground,

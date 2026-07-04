@@ -11,6 +11,8 @@ abstract class IAuthRemoteDataSource {
     required String name,
     required String email,
     required String password,
+    required String phone,
+    String? referralCode,
   });
 
   Future<void> sendPasswordResetEmail({required String email});

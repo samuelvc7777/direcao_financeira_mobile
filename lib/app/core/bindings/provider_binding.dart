@@ -18,6 +18,8 @@ import '../../data/datasources/invoice_notification_local_datasource.dart';
 import '../../data/datasources/journey_local_datasource.dart';
 import '../../data/datasources/journey_route_local_datasource.dart';
 import '../../data/datasources/location_tracking_datasource.dart';
+import '../../data/datasources/referral_datasource.dart';
+import '../../data/datasources/referral_settings_datasource.dart';
 import '../../data/datasources/recording_local_datasource.dart';
 import '../../data/datasources/recording_native_datasource.dart';
 import '../../data/datasources/ride_local_datasource.dart';
@@ -46,6 +48,7 @@ import '../../data/providers/supabase/finance/supabase_transaction_remote_dataso
 import '../../data/providers/supabase/journey/supabase_journey_remote_datasource.dart';
 import '../../data/providers/supabase/journey/supabase_ride_remote_datasource.dart';
 import '../../data/providers/supabase/realtime/supabase_realtime_client.dart';
+import '../../data/providers/supabase/referral/supabase_referral_remote_datasource.dart';
 import '../../data/providers/supabase/subscription/supabase_subscription_remote_datasource.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/bank_account_repository.dart';
@@ -58,6 +61,8 @@ import '../../data/repositories/help_repository.dart';
 import '../../data/repositories/invoice_notification_repository.dart';
 import '../../data/repositories/journey_repository_impl.dart';
 import '../../data/repositories/recording_repository_impl.dart';
+import '../../data/repositories/referral_repository.dart';
+import '../../data/repositories/referral_settings_repository.dart';
 import '../../data/repositories/ride_repository_impl.dart';
 import '../../data/repositories/subscription_repository.dart';
 import '../../data/repositories/traffic_light_repository.dart';
@@ -73,6 +78,8 @@ import '../../domain/repositories/i_help_repository.dart';
 import '../../domain/repositories/i_invoice_notification_repository.dart';
 import '../../domain/repositories/i_journey_repository.dart';
 import '../../domain/repositories/i_recording_repository.dart';
+import '../../domain/repositories/i_referral_repository.dart';
+import '../../domain/repositories/i_referral_settings_repository.dart';
 import '../../domain/repositories/i_ride_repository.dart';
 import '../../domain/repositories/i_subscription_repository.dart';
 import '../../domain/repositories/i_traffic_light_repository.dart';
@@ -80,6 +87,8 @@ import '../../domain/repositories/i_transaction_repository.dart';
 import '../../domain/usecases/create_detected_ride_usecase.dart';
 import '../../domain/usecases/costs_gains_settings_use_cases.dart';
 import '../../domain/usecases/invoice_notification_use_cases.dart';
+import '../../domain/usecases/referral_use_cases.dart';
+import '../../domain/usecases/referral_settings_use_cases.dart';
 import '../../domain/usecases/ride_status_use_cases.dart';
 import '../../domain/usecases/recording_use_cases.dart';
 import '../../domain/services/app_clock.dart';
@@ -402,6 +411,14 @@ class ProviderBinding extends Bindings {
       SupabaseTransactionRemoteDataSource(client: supabaseClient),
       permanent: true,
     );
+    Get.put<IReferralRemoteDataSource>(
+      SupabaseReferralRemoteDataSource(client: supabaseClient),
+      permanent: true,
+    );
+    Get.put<IReferralSettingsDataSource>(
+      SupabaseReferralSettingsDataSource(client: supabaseClient),
+      permanent: true,
+    );
     Get.put<IJourneyDataSource>(
       SupabaseJourneyRemoteDataSource(client: supabaseClient),
       permanent: true,
@@ -510,6 +527,45 @@ class ProviderBinding extends Bindings {
         dataSource: Get.find(),
         apiErrorMapper: Get.find<ApiErrorMapper>(),
         apiRequestLogger: Get.find<ApiRequestLogger>(),
+      ),
+      permanent: true,
+    );
+    Get.put<IReferralRepository>(
+      ReferralRepository(
+        remoteDataSource: Get.find(),
+        apiErrorMapper: Get.find<ApiErrorMapper>(),
+        apiRequestLogger: Get.find<ApiRequestLogger>(),
+      ),
+      permanent: true,
+    );
+    Get.put<IReferralSettingsRepository>(
+      ReferralSettingsRepository(
+        dataSource: Get.find<IReferralSettingsDataSource>(),
+        apiErrorMapper: Get.find<ApiErrorMapper>(),
+        apiRequestLogger: Get.find<ApiRequestLogger>(),
+      ),
+      permanent: true,
+    );
+    Get.put<GetReferralSettingsUseCase>(
+      GetReferralSettingsUseCase(Get.find<IReferralSettingsRepository>()),
+      permanent: true,
+    );
+    Get.put<GetReferralSummaryUseCase>(
+      GetReferralSummaryUseCase(Get.find<IReferralRepository>()),
+      permanent: true,
+    );
+    Get.put<GetReferralsUseCase>(
+      GetReferralsUseCase(Get.find<IReferralRepository>()),
+      permanent: true,
+    );
+    Get.put<GetPixWithdrawalsUseCase>(
+      GetPixWithdrawalsUseCase(Get.find<IReferralRepository>()),
+      permanent: true,
+    );
+    Get.put<RequestPixWithdrawalUseCase>(
+      RequestPixWithdrawalUseCase(
+        Get.find<IReferralRepository>(),
+        settingsRepository: Get.find<IReferralSettingsRepository>(),
       ),
       permanent: true,
     );

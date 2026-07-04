@@ -44,6 +44,8 @@ class _FakeAuthRemoteDataSource implements IAuthRemoteDataSource {
     required String name,
     required String email,
     required String password,
+    required String phone,
+    String? referralCode,
   }) async {
     if (registerError != null) {
       throw registerError!;
@@ -201,6 +203,7 @@ void main() {
       'Samuel',
       'samuel@example.com',
       '123456',
+      '11999999999',
     );
 
     expect(result.isLeft(), isTrue);
@@ -217,6 +220,7 @@ void main() {
       'Samuel',
       'samuel@example.com',
       '123456',
+      '11999999999',
     );
 
     expect(result.isLeft(), isTrue);

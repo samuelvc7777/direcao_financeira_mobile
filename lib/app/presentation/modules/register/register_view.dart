@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../widgets/auth_primary_button.dart';
 import '../../widgets/auth_sensitive_data_consent_sheet.dart';
 import '../../widgets/auth_text_field.dart';
+import '../../formatters/br_text_input_formatters.dart';
 import 'register_controller.dart';
 import 'widgets/password_requirements_panel.dart';
 import 'widgets/register_header.dart';
@@ -58,6 +59,39 @@ class RegisterView extends GetView<RegisterController> {
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 12),
+                    AuthTextField(
+                      controller: controller.phoneController,
+                      label: 'Telefone',
+                      hint: '(11) 99999-9999',
+                      icon: Icons.phone_android_rounded,
+                      height: 60,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      inputFormatters: [
+                        DigitsMaskTextInputFormatter('(##) #####-####'),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Obx(
+                      () => controller.showReferralCodeInput.value
+                          ? Column(
+                              children: [
+                                AuthTextField(
+                                  controller: controller.referralCodeController,
+                                  label: 'Codigo de indicacao',
+                                  hint: 'Opcional',
+                                  icon: Icons.card_giftcard_rounded,
+                                  height: 60,
+                                  keyboardType: TextInputType.text,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  textInputAction: TextInputAction.next,
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                     Obx(
                       () => AuthTextField(
                         controller: controller.passwordController,
