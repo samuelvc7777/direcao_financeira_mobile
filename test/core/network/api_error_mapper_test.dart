@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:direcao_financeira_mobile/app/core/errors/failures.dart';
 import 'package:direcao_financeira_mobile/app/core/network/api_error_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../support/dio_test_helpers.dart';
 
@@ -117,6 +118,32 @@ void main() {
       );
 
       expect(failure, isA<NetworkFailure>());
+    });
+
+    test('traduz telefone duplicado do Supabase para mensagem amigavel', () {
+      const error = PostgrestException(
+        code: '23505',
+        message:
+            'duplicate key value violates unique constraint "user_phone_unique_key"',
+      );
+
+      final failure = mapper.mapToFailure(
+        error,
+        fallback: 'Erro inesperado ao realizar cadastro.',
+      );
+
+      expect(failure, isA<ServerFailure>());
+      expect(
+        failure.message,
+        'Este telefone ja esta cadastrado. Use outro numero ou faca login.',
+      );
+      expect(
+        mapper.extractMessage(
+          error,
+          fallback: 'Erro inesperado ao realizar cadastro.',
+        ),
+        'Este telefone ja esta cadastrado. Use outro numero ou faca login.',
+      );
     });
   });
 }

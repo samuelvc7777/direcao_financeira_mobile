@@ -70,6 +70,12 @@ class ApiErrorMapper {
 
     if (error is PostgrestException) {
       final message = error.message.trim();
+      if (_isDuplicatedUserPhone(error)) {
+        return ServerFailure(
+          'Este telefone ja esta cadastrado. Use outro numero ou faca login.',
+        );
+      }
+
       if (message.toLowerCase().contains('jwt') ||
           message.toLowerCase().contains('permission') ||
           error.code == '42501') {
@@ -122,6 +128,10 @@ class ApiErrorMapper {
     }
 
     if (error is PostgrestException) {
+      if (_isDuplicatedUserPhone(error)) {
+        return 'Este telefone ja esta cadastrado. Use outro numero ou faca login.';
+      }
+
       return error.message.trim().isEmpty ? fallback : error.message;
     }
 
@@ -182,5 +192,14 @@ class ApiErrorMapper {
         message.contains('connection error') ||
         message.contains('failed host lookup') ||
         message.contains('network is unreachable');
+  }
+
+  bool _isDuplicatedUserPhone(PostgrestException error) {
+    final details = error.details?.toString().toLowerCase() ?? '';
+    final hint = error.hint?.toString().toLowerCase() ?? '';
+    final message = error.message.toLowerCase();
+    final payload = '$message $details $hint';
+
+    return error.code == '23505' && payload.contains('user_phone_unique_key');
   }
 }

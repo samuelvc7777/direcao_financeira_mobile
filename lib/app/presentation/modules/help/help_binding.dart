@@ -19,6 +19,12 @@ class HelpBinding extends Bindings {
         fenix: true,
       );
     }
+    if (!Get.isRegistered<LoadFeaturedHelpVideoUseCase>()) {
+      Get.lazyPut(
+        () => LoadFeaturedHelpVideoUseCase(Get.find<IHelpRepository>()),
+        fenix: true,
+      );
+    }
     if (!Get.isRegistered<OpenHelpSupportContactUseCase>()) {
       Get.lazyPut(
         () => OpenHelpSupportContactUseCase(Get.find<IHelpRepository>()),

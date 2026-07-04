@@ -9,6 +9,8 @@ class SupabaseTableNames {
   static const creditCardInvoices = 'CreditCardInvoice';
   static const invoicePayments = 'InvoicePayment';
   static const subscriptions = 'Subscription';
+  static const referrals = 'Referral';
+  static const pixWithdrawalRequests = 'PixWithdrawalRequest';
   static const plans = 'Plan';
   static const shifts = 'Shift';
   static const shiftRoutes = 'ShiftRoute';

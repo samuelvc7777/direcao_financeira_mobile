@@ -15,6 +15,29 @@ class LoadHelpVideosUseCase {
   }
 }
 
+class LoadFeaturedHelpVideoUseCase {
+  const LoadFeaturedHelpVideoUseCase(this.repository);
+
+  final IHelpRepository repository;
+
+  Future<Either<Failure, HelpVideoEntity?>> call() async {
+    final result = await repository.getVideos();
+    return result.map((videos) {
+      if (videos.isEmpty) {
+        return null;
+      }
+
+      for (final video in videos) {
+        if (video.isFeatured) {
+          return video;
+        }
+      }
+
+      return videos.first;
+    });
+  }
+}
+
 class GetHelpSupportContactUseCase {
   const GetHelpSupportContactUseCase(this.repository);
 

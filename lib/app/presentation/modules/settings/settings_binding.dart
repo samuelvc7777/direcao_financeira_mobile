@@ -3,8 +3,11 @@ import 'package:get/get.dart';
 import '../../../core/app_bubble/app_bubble_service.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../../domain/repositories/i_auth_repository.dart';
+import '../../../domain/repositories/i_help_repository.dart';
 import '../../../domain/repositories/i_subscription_repository.dart';
 import '../../../domain/usecases/auth_session_use_cases.dart';
+import '../../../domain/usecases/help_use_cases.dart';
+import '../../../domain/usecases/referral_settings_use_cases.dart';
 import '../../../domain/usecases/subscription_use_cases.dart';
 import 'settings_controller.dart';
 
@@ -43,6 +46,13 @@ class SettingsBinding extends Bindings {
         fenix: true,
       );
     }
+    if (!Get.isRegistered<LoadFeaturedHelpVideoUseCase>() &&
+        Get.isRegistered<IHelpRepository>()) {
+      Get.lazyPut(
+        () => LoadFeaturedHelpVideoUseCase(Get.find<IHelpRepository>()),
+        fenix: true,
+      );
+    }
     if (!Get.isRegistered<SettingsController>()) {
       Get.lazyPut<SettingsController>(
         () => SettingsController(
@@ -54,6 +64,14 @@ class SettingsBinding extends Bindings {
           getMySubscriptionUseCase: Get.find<GetMySubscriptionUseCase>(),
           syncStoredUserSubscriptionUseCase:
               Get.find<SyncStoredUserSubscriptionUseCase>(),
+          getReferralSettingsUseCase:
+              Get.isRegistered<GetReferralSettingsUseCase>()
+              ? Get.find<GetReferralSettingsUseCase>()
+              : null,
+          loadFeaturedHelpVideoUseCase:
+              Get.isRegistered<LoadFeaturedHelpVideoUseCase>()
+              ? Get.find<LoadFeaturedHelpVideoUseCase>()
+              : null,
         ),
         fenix: true,
       );

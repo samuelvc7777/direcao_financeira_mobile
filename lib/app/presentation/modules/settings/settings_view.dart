@@ -54,6 +54,8 @@ class SettingsView extends GetView<SettingsController> {
                       children: [
                         SettingsProfileCard(controller: controller),
                         const SizedBox(height: 22),
+                        _DemoVideoCard(controller: controller),
+                        const SizedBox(height: 20),
                         Column(
                           children: controller.sections
                               .map(
@@ -93,6 +95,119 @@ class SettingsView extends GetView<SettingsController> {
     }
 
     PremiumAccessGuard().run(() => controller.openSettingItem(item));
+  }
+}
+
+class _DemoVideoCard extends StatelessWidget {
+  const _DemoVideoCard({required this.controller});
+
+  final SettingsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+
+    return Obx(() {
+      final video = controller.demoVideo.value;
+      final isLoading = controller.isDemoVideoLoading.value;
+      final title = video?.title ?? 'Video demonstrativo';
+      final subtitle = video?.description.isNotEmpty == true
+          ? video!.description
+          : 'Veja em poucos minutos como a Direcao Financeira ajuda na rotina.';
+
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: isLoading ? null : controller.openDemoVideo,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.electricCyan.withValues(alpha: 0.26),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.electricCyan.withValues(alpha: 0.08),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.electricCyan.withValues(alpha: 0.95),
+                        AppColors.royalBlue.withValues(alpha: 0.90),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(17),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.play_circle_fill_rounded,
+                          color: Colors.white,
+                          size: 34,
+                        ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.64),
+                          fontSize: 13,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colorScheme.onSurface.withValues(alpha: 0.56),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
 

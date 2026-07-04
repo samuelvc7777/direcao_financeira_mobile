@@ -24,4 +24,17 @@ void main() {
 
     expect(model.youtubeVideoId, 'HxgGW_ECu0w');
   });
+
+  test('le campo is_featured vindo do banco', () {
+    final model = HelpVideoModel.fromMap({
+      'id': 'demo',
+      'title': 'Video demonstrativo',
+      'youtube_video_id': 'HxgGW_ECu0w',
+      'is_featured': true,
+      'sort_order': 3,
+    });
+
+    expect(model.isFeatured, isTrue);
+    expect(model.sortOrder, 3);
+  });
 }

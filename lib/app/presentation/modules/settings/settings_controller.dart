@@ -13,10 +13,14 @@ import '../../../core/preferences/app_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/subscription_entity.dart';
 import '../../../domain/entities/user_entity.dart';
+import '../../../domain/entities/help_video_entity.dart';
 import '../../../domain/usecases/auth_session_use_cases.dart';
+import '../../../domain/usecases/help_use_cases.dart';
 import '../../../domain/usecases/invoice_notification_use_cases.dart';
+import '../../../domain/usecases/referral_settings_use_cases.dart';
 import '../../../domain/usecases/subscription_use_cases.dart';
 import '../costs_gains_settings/costs_gains_flow_coordinator.dart';
+import '../help/widgets/help_video_fullscreen_view.dart';
 import '../../../routes/app_pages.dart';
 
 class SettingsController extends GetxController with WidgetsBindingObserver {
@@ -28,6 +32,8 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     required this.updateProfilePhotoUseCase,
     this.getMySubscriptionUseCase,
     this.syncStoredUserSubscriptionUseCase,
+    this.getReferralSettingsUseCase,
+    this.loadFeaturedHelpVideoUseCase,
     this.setInvoiceNotificationsEnabledUseCase,
     NotificationPermissionService? notificationPermissionService,
     ImagePicker? imagePicker,
@@ -45,6 +51,8 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   final UpdateProfilePhotoUseCase updateProfilePhotoUseCase;
   final GetMySubscriptionUseCase? getMySubscriptionUseCase;
   final SyncStoredUserSubscriptionUseCase? syncStoredUserSubscriptionUseCase;
+  final GetReferralSettingsUseCase? getReferralSettingsUseCase;
+  final LoadFeaturedHelpVideoUseCase? loadFeaturedHelpVideoUseCase;
   final SetInvoiceNotificationsEnabledUseCase?
   setInvoiceNotificationsEnabledUseCase;
   final NotificationPermissionService _notificationPermissionService;
@@ -70,6 +78,9 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   final planProgress = 0.99.obs;
   final isSubscriptionRefreshing = false.obs;
   final isProfilePhotoSaving = false.obs;
+  final canShowReferralEntryPoint = true.obs;
+  final demoVideo = Rxn<HelpVideoEntity>();
+  final isDemoVideoLoading = false.obs;
 
   final sections = <SettingsSection>[
     SettingsSection(
@@ -154,8 +165,35 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_loadUser());
+    unawaited(_loadReferralSettings());
+    unawaited(_loadDemoVideo());
     _loadAppBubbleState();
     unawaited(refreshNotificationPermission());
+  }
+
+  Future<void> _loadReferralSettings() async {
+    final useCase = getReferralSettingsUseCase;
+    if (useCase == null) return;
+
+    final result = await useCase();
+    result.fold((_) => canShowReferralEntryPoint.value = true, (settings) {
+      canShowReferralEntryPoint.value = settings.canShowEntryPoint;
+    });
+  }
+
+  Future<void> _loadDemoVideo() async {
+    final useCase = loadFeaturedHelpVideoUseCase;
+    if (useCase == null) return;
+
+    isDemoVideoLoading.value = true;
+    final result = await useCase();
+    result.fold(
+      (failure) => debugPrint(
+        '[SettingsController] Erro ao carregar video demonstrativo: ${failure.message}',
+      ),
+      (video) => demoVideo.value = video,
+    );
+    isDemoVideoLoading.value = false;
   }
 
   @override
@@ -355,6 +393,34 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   }
 
   void openSubscription() => Get.toNamed(AppRoutes.subscription);
+
+  void openDemoVideo() {
+    final video = demoVideo.value;
+    if (video == null) {
+      _showInfo(
+        'Video demonstrativo',
+        'O video demonstrativo ainda nao foi configurado.',
+      );
+      return;
+    }
+
+    Get.to<void>(
+      () => HelpVideoFullscreenView(video: video),
+      fullscreenDialog: true,
+    );
+  }
+
+  void openReferrals() {
+    if (!canShowReferralEntryPoint.value) {
+      _showInfo(
+        'Indicacoes',
+        'O programa de indicacoes nao esta disponivel no momento.',
+      );
+      return;
+    }
+
+    Get.toNamed(AppRoutes.referrals);
+  }
 
   Future<void> toggleAppBubble(bool value) async {
     if (isAppBubbleBusy.value) return;
