@@ -161,6 +161,7 @@ void main() {
       findsOneWidget,
     ); // O CustomAppBar tem apenas 1 titulo 'Ajustes' renderizado visivelmente.
     expect(find.text('Sem plano ativo'), findsOneWidget);
+    expect(find.text('Video demonstrativo'), findsOneWidget);
     expect(find.text('FINANCAS'), findsOneWidget);
     expect(find.text('CATEGORIAS'), findsOneWidget);
     expect(find.text('CONFIGURACOES DE TRABALHO (SEMAFORO)'), findsOneWidget);

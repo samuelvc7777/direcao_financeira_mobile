@@ -5,9 +5,13 @@ import 'package:get/get.dart';
 
 import '../../core/session/user_cache.dart';
 import '../../core/subscription/play_store_subscription_contract.dart';
+import '../../domain/entities/help_video_entity.dart';
 import '../../domain/entities/plan_entity.dart';
+import '../../domain/repositories/i_help_repository.dart';
 import '../../domain/services/premium_access_policy.dart';
+import '../../domain/usecases/help_use_cases.dart';
 import '../../domain/usecases/subscription_use_cases.dart';
+import '../modules/help/widgets/help_video_fullscreen_view.dart';
 import '../modules/subscription/subscription_binding.dart';
 import '../modules/subscription/subscription_controller.dart';
 import '../../routes/app_pages.dart';
@@ -80,9 +84,10 @@ class PremiumAccessGuard {
       return;
     }
 
-    final subscriptionController = _tryFindSubscriptionController();
     _isShowingBanner = true;
     try {
+      final subscriptionController = _tryFindSubscriptionController();
+      final demoVideo = await _loadDemoVideo();
       await Get.bottomSheet<void>(
         PremiumAccessBanner(
           onStartTrial: subscriptionController == null
@@ -100,6 +105,10 @@ class PremiumAccessGuard {
           onRestoreSubscription: subscriptionController == null
               ? null
               : () => subscriptionController.restorePurchases(),
+          demoVideo: demoVideo,
+          onWatchDemoVideo: demoVideo == null
+              ? null
+              : () => _openDemoVideo(demoVideo),
         ),
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -108,6 +117,32 @@ class PremiumAccessGuard {
     } finally {
       _isShowingBanner = false;
     }
+  }
+
+  Future<HelpVideoEntity?> _loadDemoVideo() async {
+    try {
+      final useCase = Get.isRegistered<LoadFeaturedHelpVideoUseCase>()
+          ? Get.find<LoadFeaturedHelpVideoUseCase>()
+          : LoadFeaturedHelpVideoUseCase(Get.find<IHelpRepository>());
+      final result = await useCase();
+      return result.fold((_) => null, (video) => video);
+    } catch (error) {
+      debugPrint(
+        '[PremiumAccessGuard] video demonstrativo indisponivel: $error',
+      );
+      return null;
+    }
+  }
+
+  void _openDemoVideo(HelpVideoEntity video) {
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back<void>();
+    }
+
+    Get.to<void>(
+      () => HelpVideoFullscreenView(video: video),
+      fullscreenDialog: true,
+    );
   }
 
   SubscriptionController? _tryFindSubscriptionController() {
